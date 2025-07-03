@@ -1,0 +1,5 @@
+/* You can place this in src/pages/calendar.css for extra control */
+.react-calendar__tile--active {
+  background: #2563eb !important; /* Tailwind blue-600 */
+  color: white;
+}
