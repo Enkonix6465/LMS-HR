@@ -18,6 +18,7 @@ import LeaveApprovalPage from "./pages/LeaveApprovalPage";
 import ChatMeetingPage from "./pages/ChatMeetingPage";
 import GeneratePayslip from "./pages/GeneratePayslip";
 import SalaryForm from "./pages/SalaryForm";
+import OfficeIPConfig from "./pages/OfficeIPConfig";
 function App() {
   const { user, loading } = useAuthStore();
   const { theme } = useThemeStore();
@@ -64,6 +65,9 @@ function App() {
           <Route path="ChatMeetingPage" element={<ChatMeetingPage />} />
           <Route path="GeneratePayslip" element={<GeneratePayslip />} />
           <Route path="SalaryForm" element={<SalaryForm />} />
+          <Route path="OfficeIPConfig" element={<OfficeIPConfig />} />
+
+          {/* Dashboard */}
 
           {/* Work Location Assignment */}
           <Route

@@ -149,6 +149,7 @@ function Layout() {
               icon: MessageSquareTextIcon,
               label: "Chat & Meeting Room",
             },
+            { path: "/OfficeIPConfig", icon: CheckSquare, label: "Office IPs" },
 
             { path: "/settings", icon: Settings, label: "Settings" },
           ].map(({ path, icon: Icon, label }) => (
