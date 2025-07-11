@@ -65,6 +65,7 @@ interface MonthlySummary {
   extraLeaves: number;
   carryForwardLeaves: number;
   totalWorkingDays: number;
+  workingDaysTillToday: number;
   totalmonthHours: string;
   absentDays: number;
 }
@@ -136,6 +137,8 @@ export default function SearchAttendanceDashboard() {
       summarySnap.forEach((doc) => {
         const s = doc.data();
 
+        const countedLength = s.countedDates?.length || 0;
+
         data.push({
           userId: s.userId,
           name: s.name,
@@ -147,8 +150,10 @@ export default function SearchAttendanceDashboard() {
           leavesTaken: s.leavesTaken,
           extraLeaves: s.extraLeaves,
           totalWorkingDays: s.totalWorkingDays,
+          workingDaysTillToday: countedLength,
           totalmonthHours: s.totalmonthHours,
-          absentDays: s.totalWorkingDays - (s.presentDays + s.halfDays),
+          absentDays:
+            countedLength - (s.presentDays + s.halfDays + s.leavesTaken),
           carryForwardLeaves: s.carryForwardLeaves || 0,
         });
       });
@@ -271,26 +276,26 @@ export default function SearchAttendanceDashboard() {
     : [];
 
   return (
-    <div className="p-6">
-      <h2 className="text-3xl font-bold mb-6 text-center text-blue-700">
+    <div className="p-4 sm:p-6 text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <h2 className="text-3xl font-bold mb-6 text-center text-blue-700 dark:text-blue-400 animate-fade-in">
         Employee Attendance & Leave Dashboard
       </h2>
 
       {!selected ? (
         <>
-          <div className="w-full max-w-md mx-auto mb-6">
+          <div className="w-full max-w-md mx-auto mb-6 animate-fade-in">
             <input
               type="text"
               placeholder="Search by employee name or ID..."
-              className="w-full border border-gray-300 px-4 py-2 rounded shadow-sm focus:outline-none focus:ring focus:ring-blue-200"
+              className="w-full border border-gray-300 dark:border-gray-700 px-4 py-2 rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 dark:bg-gray-800 dark:text-white transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
-          <div className="max-w-4xl mx-auto bg-white shadow-md rounded overflow-hidden">
-            <table className="min-w-full table-auto text-sm border border-gray-300">
-              <thead className="bg-blue-100 text-gray-800 font-semibold">
+          <div className="max-w-6xl mx-auto bg-white dark:bg-gray-800 shadow-lg rounded overflow-x-auto animate-slide-up">
+            <table className="min-w-full table-auto text-sm border border-gray-300 dark:border-gray-700">
+              <thead className="bg-blue-100 dark:bg-blue-900 text-gray-800 dark:text-gray-200 font-semibold">
                 <tr>
                   <th className="px-4 py-2 border">Name</th>
                   <th className="px-4 py-2 border">Email</th>
@@ -302,14 +307,14 @@ export default function SearchAttendanceDashboard() {
                 {filtered.map((emp, idx) => (
                   <tr
                     key={idx}
-                    className="hover:bg-gray-50 transition-all duration-150"
+                    className="hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-150"
                   >
                     <td className="px-4 py-2 border">{emp.name}</td>
                     <td className="px-4 py-2 border">{emp.email}</td>
                     <td className="px-4 py-2 border">{emp.department}</td>
                     <td className="px-4 py-2 border">
                       <button
-                        className="text-blue-600 underline hover:text-blue-800"
+                        className="text-white bg-blue-600 hover:bg-blue-700 transition px-3 py-1 rounded shadow-sm text-xs sm:text-sm"
                         onClick={() => setSelected(emp)}
                       >
                         View Attendance
@@ -325,24 +330,26 @@ export default function SearchAttendanceDashboard() {
         <>
           <button
             onClick={() => setSelected(null)}
-            className="mb-4 bg-gray-100 text-sm text-gray-700 px-4 py-2 rounded hover:bg-gray-200 transition"
+            className="mb-4 bg-gray-100 dark:bg-gray-800 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 px-4 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition duration-200"
           >
             ← Back to Employee List
           </button>
 
           <div className="max-w-6xl mx-auto px-4 py-6">
-            <h1 className="text-2xl font-bold text-center mb-2 text-blue-600">
+            <h1 className="text-2xl font-bold text-center mb-2 text-blue-600 dark:text-blue-400 animate-fade-in-down">
               📅 Attendance History
             </h1>
-            <p className="text-center text-gray-600 mb-4">
-              👤 {selected?.name}
+            <p className="text-center text-gray-600 dark:text-gray-300 mb-4">
+              {selected?.name}
             </p>
 
-            <div className="flex items-center justify-center mb-6 space-x-4">
-              <label className="text-gray-700 font-medium">Select Date:</label>
+            <div className="flex items-center justify-center flex-wrap gap-3 mb-6">
+              <label className="text-gray-700 dark:text-gray-200 font-medium">
+                Select Date:
+              </label>
               <input
                 type="date"
-                className="border border-gray-300 px-3 py-2 rounded shadow-sm focus:outline-none focus:ring focus:ring-blue-200"
+                className="border border-gray-300 dark:border-gray-700 px-3 py-2 rounded shadow-sm focus:outline-none focus:ring focus:ring-blue-200 dark:bg-gray-800 dark:text-white"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 max={new Date().toISOString().split("T")[0]}
@@ -363,9 +370,9 @@ export default function SearchAttendanceDashboard() {
               </p>
             )}
 
-            <div className="overflow-x-auto bg-white shadow-md rounded-md">
-              <table className="w-full text-sm text-left border min-w-[800px]">
-                <thead className="bg-gray-100 text-gray-800 font-semibold">
+            <div className="overflow-x-auto bg-white dark:bg-gray-800 shadow-md rounded-md animate-slide-up">
+              <table className="w-full text-sm text-left border border-gray-300 dark:border-gray-700 min-w-[800px]">
+                <thead className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold">
                   <tr>
                     <th className="border px-4 py-2">#</th>
                     <th className="border px-4 py-2">Date</th>
@@ -383,7 +390,7 @@ export default function SearchAttendanceDashboard() {
                     return (
                       <tr
                         key={index}
-                        className="hover:bg-gray-50 transition-all"
+                        className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
                       >
                         <td className="border px-4 py-2">{index + 1}</td>
                         <td className="border px-4 py-2">{att.date}</td>
@@ -399,7 +406,7 @@ export default function SearchAttendanceDashboard() {
                             {att.sessions.map((s, i) => (
                               <li
                                 key={i}
-                                className="pb-2 border-b last:border-b-0 text-sm"
+                                className="pb-2 border-b border-dashed last:border-b-0 text-sm"
                               >
                                 <div>
                                   <span className="text-green-600 font-semibold">
@@ -407,7 +414,7 @@ export default function SearchAttendanceDashboard() {
                                   </span>{" "}
                                   {s.login || "—"}
                                 </div>
-                                <div className="ml-4 text-xs text-gray-600">
+                                <div className="ml-4 text-xs text-gray-600 dark:text-gray-300">
                                   📍 {s.loginLocation.address}
                                 </div>
 
@@ -417,7 +424,7 @@ export default function SearchAttendanceDashboard() {
                                   </span>{" "}
                                   {s.logout || "⏳"}
                                 </div>
-                                <div className="ml-4 text-xs text-gray-600">
+                                <div className="ml-4 text-xs text-gray-600 dark:text-gray-300">
                                   📍 {s.logoutLocation.address}
                                 </div>
                               </li>
@@ -433,49 +440,100 @@ export default function SearchAttendanceDashboard() {
           </div>
 
           {/* Monthly Summary */}
-          <div className="p-6">
-            <h2 className="text-2xl font-bold text-center mb-4 text-green-700">
+          <div className="p-4 sm:p-6">
+            <h2 className="text-2xl font-bold text-center mb-4 text-green-700 dark:text-green-400 animate-fade-in">
               📋 Monthly Attendance Summary
             </h2>
 
-            <table className="w-full table-auto border text-sm text-center shadow">
-              <thead className="bg-green-100 text-black font-bold">
-                <tr>
-                  <th className="border px-3 py-2">Month</th>
-                  <th className="border px-3 py-2">Working Days</th>
-                  <th className="border px-3 py-2">Present</th>
-                  <th className="border px-3 py-2">Half</th>
-                  <th className="border px-3 py-2">Absent</th>
-                  <th className="border px-3 py-2">Leaves Taken</th>
-                  <th className="border px-3 py-2 text-red-600">
-                    Extra Leaves
-                  </th>
-                  <th className="border px-3 py-2 text-green-600">
-                    Carry Forward
-                  </th>
-                  <th className="border px-3 py-2">Total Hours</th>
-                </tr>
-              </thead>
-              <tbody>
-                {getEmployeeSummaries(selected.id).map((row, idx) => (
-                  <tr key={idx} className="bg-white">
-                    <td className="border px-3 py-2">{row.month}</td>
-                    <td className="border px-3 py-2">{row.totalWorkingDays}</td>
-                    <td className="border px-3 py-2">{row.presentDays}</td>
-                    <td className="border px-3 py-2">{row.halfDays}</td>
-                    <td className="border px-3 py-2">{row.absentDays}</td>
-                    <td className="border px-3 py-2">{row.leavesTaken}</td>
-                    <td className="border px-3 py-2 text-red-600">
-                      {row.extraLeaves}
-                    </td>
-                    <td className="border px-3 py-2 text-green-600">
-                      {row.carryForwardLeaves}
-                    </td>
-                    <td className="border px-3 py-2">{row.totalmonthHours}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full table-auto border text-sm text-center shadow bg-white dark:bg-gray-800 rounded-md min-w-[900px] animate-slide-up">
+                <thead className="bg-green-100 dark:bg-green-900 text-black dark:text-gray-200 font-bold">
+                  <tr>
+                    <th className="border px-3 py-2">Month</th>
+                    <th className="border px-3 py-2">Working Days</th>
+                    <th className="border px-3 py-2 text-blue-600 dark:text-blue-300">
+                      Working Days (Till Today)
+                    </th>
+                    <th className="border px-3 py-2">Present</th>
+                    <th className="border px-3 py-2">Half</th>
+                    <th className="border px-3 py-2">Absent</th>
+                    <th className="border px-3 py-2">Leaves Taken</th>
+                    <th className="border px-3 py-2 text-red-600">
+                      Extra Leaves
+                    </th>
+                    <th className="border px-3 py-2 text-green-600">
+                      Carry Forward
+                    </th>
+                    <th className="border px-3 py-2">Total Hours</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {getEmployeeSummaries(selected.id).map((row, idx) => {
+                    const extraWorkLog = summaries.find(
+                      (s) => s.userId === row.userId && s.month === row.month
+                    ) as any;
+
+                    const extraHours: Record<string, string> =
+                      extraWorkLog?.extraWorkLog || {};
+
+                    return (
+                      <React.Fragment key={idx}>
+                        <tr className="bg-white dark:bg-gray-900 font-semibold">
+                          <td className="border px-3 py-2">{row.month}</td>
+                          <td className="border px-3 py-2">
+                            {row.totalWorkingDays}
+                          </td>
+                          <td className="border px-3 py-2">
+                            {row.workingDaysTillToday}
+                          </td>
+                          <td className="border px-3 py-2">
+                            {row.presentDays}
+                          </td>
+                          <td className="border px-3 py-2">{row.halfDays}</td>
+                          <td className="border px-3 py-2">{row.absentDays}</td>
+                          <td className="border px-3 py-2">
+                            {row.leavesTaken}
+                          </td>
+                          <td className="border px-3 py-2 text-red-600">
+                            {row.extraLeaves}
+                          </td>
+                          <td className="border px-3 py-2 text-green-600">
+                            {row.carryForwardLeaves}
+                          </td>
+                          <td className="border px-3 py-2">
+                            {row.totalmonthHours}
+                          </td>
+                        </tr>
+                        {Object.entries(extraHours).length > 0 && (
+                          <tr className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-700 dark:text-gray-300">
+                            <td
+                              colSpan={10}
+                              className="border px-3 py-2 text-left"
+                            >
+                              <span className="font-semibold text-green-700 dark:text-green-300">
+                                🕒 Extra Hours Worked:
+                              </span>
+                              <ul className="list-disc list-inside mt-1 space-y-1">
+                                {Object.entries(extraHours).map(
+                                  ([date, duration]) => (
+                                    <li key={date}>
+                                      {date}:{" "}
+                                      <span className="font-medium">
+                                        {duration}
+                                      </span>
+                                    </li>
+                                  )
+                                )}
+                              </ul>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}

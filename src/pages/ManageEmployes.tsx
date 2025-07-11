@@ -173,76 +173,49 @@ export default function EmployeeManagement() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <h2 className="text-2xl font-bold mb-4">Employee Management</h2>
+    <div className="max-w-6xl mx-auto p-4 sm:p-6 text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <h2 className="text-3xl font-bold mb-6 text-center text-blue-700 dark:text-blue-400 animate-fade-in-down">
+        Employee Management
+      </h2>
 
-      {loading && <div className="text-blue-600 mb-2">Loading...</div>}
-      {message && <div className="text-green-600 mb-2">{message}</div>}
+      {loading && (
+        <div className="text-blue-600 dark:text-blue-400 mb-3 animate-fade-in">
+          Loading...
+        </div>
+      )}
+      {message && (
+        <div className="text-green-600 dark:text-green-400 mb-3 animate-fade-in">
+          {message}
+        </div>
+      )}
 
-      <div className="bg-white shadow p-4 rounded mb-6">
-        <h3 className="font-semibold mb-2">Add / Edit Employee</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <input
-            name="name"
-            value={form.name}
-            onChange={handleChange}
-            placeholder="Full Name"
-            className="border p-2 rounded"
-          />
-          <input
-            name="email"
-            value={form.email}
-            onChange={handleChange}
-            placeholder="Email"
-            className="border p-2 rounded"
-          />
-          <input
-            name="phone"
-            value={form.phone}
-            onChange={handleChange}
-            placeholder="Phone"
-            className="border p-2 rounded"
-          />
-          <input
-            name="photo"
-            value={form.photo}
-            onChange={handleChange}
-            placeholder="Photo URL"
-            className="border p-2 rounded"
-          />
-          <input
-            name="title"
-            value={form.title}
-            onChange={handleChange}
-            placeholder="Job Title"
-            className="border p-2 rounded"
-          />
-          <input
-            name="department"
-            value={form.department}
-            onChange={handleChange}
-            placeholder="Department"
-            className="border p-2 rounded"
-          />
-          <input
-            name="manager"
-            value={form.manager}
-            onChange={handleChange}
-            placeholder="Manager"
-            className="border p-2 rounded"
-          />
-          <input
-            name="location"
-            value={form.location}
-            onChange={handleChange}
-            placeholder="Location"
-            className="border p-2 rounded"
-          />
+      <div className="bg-white dark:bg-gray-800 shadow-lg p-4 rounded mb-8 animate-slide-up">
+        <h3 className="font-semibold mb-4 text-lg">➕ Add / Edit Employee</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            ["name", "Full Name"],
+            ["email", "Email"],
+            ["phone", "Phone"],
+            ["photo", "Photo URL"],
+            ["title", "Job Title"],
+            ["department", "Department"],
+            ["manager", "Manager"],
+            ["location", "Location"],
+          ].map(([name, placeholder]) => (
+            <input
+              key={name}
+              name={name}
+              value={form[name as keyof Employee]}
+              onChange={handleChange}
+              placeholder={placeholder}
+              className="border p-2 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+          ))}
           <select
             name="type"
             value={form.type}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           >
             <option>Full-time</option>
             <option>Part-time</option>
@@ -253,7 +226,7 @@ export default function EmployeeManagement() {
             name="status"
             value={form.status}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           >
             <option>Active</option>
             <option>Inactive</option>
@@ -264,85 +237,90 @@ export default function EmployeeManagement() {
             name="dob"
             value={form.dob}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           />
           <input
             type="date"
             name="joiningDate"
             value={form.joiningDate}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           />
         </div>
         <button
           onClick={handleAddOrUpdate}
-          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded transition duration-200"
         >
           {editIndex !== null ? "Update" : "Add"} Employee
         </button>
 
-        <div className="mt-4">
-          <label className="font-medium">Bulk Upload (CSV/XLSX)</label>
+        <div className="mt-6">
+          <label className="block font-medium mb-1">📥 Bulk Upload</label>
           <input
             type="file"
             accept=".csv,.xlsx"
             onChange={handleBulkUpload}
-            className="border p-2 mt-1 w-full rounded"
+            className="border w-full p-2 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           />
         </div>
       </div>
 
-      <div className="bg-white shadow p-4 rounded">
-        <h3 className="font-semibold mb-2">All Employees</h3>
-        <table className="w-full table-auto border border-gray-300">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border px-2 py-1">Photo</th>
-              <th className="border px-2 py-1">Name</th>
-              <th className="border px-2 py-1">Email</th>
-              <th className="border px-2 py-1">Phone</th>
-              <th className="border px-2 py-1">Department</th>
-              <th className="border px-2 py-1">Status</th>
-              <th className="border px-2 py-1">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.map((emp, idx) => (
-              <tr key={idx} className="text-center hover:bg-gray-100">
-                <td className="border px-2 py-1">
-                  {emp.photo ? (
-                    <img
-                      src={emp.photo}
-                      alt={emp.name}
-                      className="h-10 w-10 rounded-full mx-auto"
-                    />
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td className="border px-2 py-1">{emp.name}</td>
-                <td className="border px-2 py-1">{emp.email}</td>
-                <td className="border px-2 py-1">{emp.phone}</td>
-                <td className="border px-2 py-1">{emp.department}</td>
-                <td className="border px-2 py-1">{emp.status}</td>
-                <td className="border px-2 py-1 space-x-2">
-                  <button
-                    onClick={() => handleEdit(idx)}
-                    className="bg-yellow-500 text-white px-2 py-1 rounded"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(idx)}
-                    className="bg-red-600 text-white px-2 py-1 rounded"
-                  >
-                    Delete
-                  </button>
-                </td>
+      <div className="bg-white dark:bg-gray-800 shadow-lg p-4 rounded animate-fade-in">
+        <h3 className="font-semibold mb-4 text-lg">📋 All Employees</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full table-auto border text-sm min-w-[800px]">
+            <thead className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100">
+              <tr>
+                <th className="border px-2 py-2">Photo</th>
+                <th className="border px-2 py-2">Name</th>
+                <th className="border px-2 py-2">Email</th>
+                <th className="border px-2 py-2">Phone</th>
+                <th className="border px-2 py-2">Department</th>
+                <th className="border px-2 py-2">Status</th>
+                <th className="border px-2 py-2">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {employees.map((emp, idx) => (
+                <tr
+                  key={idx}
+                  className="text-center hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                >
+                  <td className="border px-2 py-2">
+                    {emp.photo ? (
+                      <img
+                        src={emp.photo}
+                        alt={emp.name}
+                        className="h-10 w-10 rounded-full mx-auto object-cover"
+                      />
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                  <td className="border px-2 py-2">{emp.name}</td>
+                  <td className="border px-2 py-2">{emp.email}</td>
+                  <td className="border px-2 py-2">{emp.phone}</td>
+                  <td className="border px-2 py-2">{emp.department}</td>
+                  <td className="border px-2 py-2">{emp.status}</td>
+                  <td className="border px-2 py-2 space-x-2">
+                    <button
+                      onClick={() => handleEdit(idx)}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(idx)}
+                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

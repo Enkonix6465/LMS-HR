@@ -25,6 +25,10 @@ const SalaryForm = () => {
       incentives: "",
       overtimePay: "",
       otherAllowances: "",
+      providentFund: "",
+      professionalTax: "",
+      incomeTax: "",
+      extraDeductions: "",
     };
   }
 
@@ -52,7 +56,6 @@ const SalaryForm = () => {
       }
 
       setEmployees(allEmps);
-      console.log("Eligible employees:", allEmps);
     } catch (error) {
       console.error("Error fetching employees:", error);
     }
@@ -81,7 +84,7 @@ const SalaryForm = () => {
       alert("Salary details saved successfully");
       setFormData(initialFormData());
       setSelectedId("");
-      fetchEligibleEmployees(); // Refresh dropdown
+      fetchEligibleEmployees();
     } catch (error) {
       console.error("Error saving salary data:", error);
       alert("Failed to save salary details.");
@@ -89,14 +92,16 @@ const SalaryForm = () => {
   };
 
   return (
-    <div className="p-4 max-w-4xl mx-auto bg-white shadow rounded">
-      <h2 className="text-2xl font-bold mb-4 text-center text-blue-700">
+    <div className="p-4 max-w-4xl mx-auto bg-white dark:bg-gray-900 dark:text-white shadow-md rounded transition-all duration-500">
+      <h2 className="text-2xl font-bold mb-4 text-center text-blue-700 dark:text-blue-300 transition-all">
         Salary Entry Form
       </h2>
 
-      <label className="block mb-2 font-medium">Select Employee:</label>
+      <label className="block mb-2 font-medium transition-all">
+        Select Employee:
+      </label>
       <select
-        className="border p-2 w-full mb-6 rounded"
+        className="border p-2 w-full mb-6 rounded dark:bg-gray-800 dark:border-gray-600 transition-all"
         value={selectedId}
         onChange={(e) => setSelectedId(e.target.value)}
       >
@@ -110,9 +115,9 @@ const SalaryForm = () => {
 
       <form
         onSubmit={handleSubmit}
-        className="grid grid-cols-1 md:grid-cols-2 gap-4"
+        className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn"
       >
-        <h3 className="col-span-full text-lg font-semibold text-gray-700 mb-2">
+        <h3 className="col-span-full text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
           🏦 Bank Details
         </h3>
 
@@ -131,12 +136,12 @@ const SalaryForm = () => {
             value={formData[name]}
             onChange={handleChange}
             placeholder={label}
-            className="border p-2 rounded"
+            className="border p-2 rounded dark:bg-gray-800 dark:border-gray-600 transition-all"
             required={!label.toLowerCase().includes("optional")}
           />
         ))}
 
-        <h3 className="col-span-full text-lg font-semibold text-gray-700 mt-6 mb-2">
+        <h3 className="col-span-full text-lg font-semibold text-gray-700 dark:text-gray-300 mt-6 mb-2">
           💰 Earnings
         </h3>
 
@@ -158,13 +163,35 @@ const SalaryForm = () => {
             onChange={handleChange}
             placeholder={label}
             type="number"
-            className="border p-2 rounded"
+            className="border p-2 rounded dark:bg-gray-800 dark:border-gray-600 transition-all"
+          />
+        ))}
+
+        <h3 className="col-span-full text-lg font-semibold text-gray-700 dark:text-gray-300 mt-6 mb-2">
+          🧾 Deductions
+        </h3>
+
+        {[
+          { label: "Provident Fund", name: "providentFund" },
+          { label: "Professional Tax", name: "professionalTax" },
+          { label: "Income Tax", name: "incomeTax" },
+          { label: "Other Deductions (Optional)", name: "extraDeductions" },
+        ].map(({ label, name }) => (
+          <input
+            key={name}
+            name={name}
+            value={formData[name]}
+            onChange={handleChange}
+            placeholder={label}
+            type="number"
+            className="border p-2 rounded dark:bg-gray-800 dark:border-gray-600 transition-all"
+            required={!label.toLowerCase().includes("optional")}
           />
         ))}
 
         <button
           type="submit"
-          className="col-span-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700 mt-6"
+          className="col-span-full bg-blue-600 hover:bg-blue-700 transition-all text-white p-3 rounded mt-6"
         >
           Save Salary
         </button>

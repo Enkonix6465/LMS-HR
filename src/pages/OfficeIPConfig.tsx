@@ -38,40 +38,42 @@ export default function OfficeIPConfig() {
   }, []);
 
   return (
-    <div className="max-w-xl mx-auto py-10 px-4">
-      <h2 className="text-2xl font-bold mb-4 text-center">
+    <div className="max-w-xl mx-auto py-10 px-4 text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-center text-blue-700 dark:text-blue-400 animate-fade-in-down">
         🛡️ Configure Office IPs
       </h2>
 
       {message && (
-        <div className="text-green-600 text-center mb-2">{message}</div>
+        <div className="text-green-600 dark:text-green-400 text-center mb-4 animate-fade-in">
+          {message}
+        </div>
       )}
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6 animate-slide-up">
         <input
           value={newIP}
           onChange={(e) => setNewIP(e.target.value)}
           placeholder="Enter IP (e.g. 192.168.1.100)"
-          className="flex-1 border p-2 rounded"
+          className="flex-1 border border-gray-300 dark:border-gray-600 p-2 rounded shadow-sm dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           onClick={addIP}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition duration-200 shadow-md"
         >
           ➕ Add
         </button>
       </div>
 
-      <ul className="space-y-2 mb-4">
+      <ul className="space-y-3 mb-6 animate-fade-in">
         {ipList.map((ip, index) => (
           <li
             key={index}
-            className="flex justify-between items-center bg-gray-100 p-2 rounded"
+            className="flex justify-between items-center bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-3 rounded shadow-sm transition transform hover:scale-[1.01]"
           >
-            <span>{ip}</span>
+            <span className="break-words">{ip}</span>
             <button
               onClick={() => removeIP(ip)}
-              className="text-red-600 font-semibold"
+              className="text-red-600 hover:text-red-700 font-semibold transition"
             >
               ❌ Remove
             </button>
@@ -81,7 +83,7 @@ export default function OfficeIPConfig() {
 
       <button
         onClick={saveIPs}
-        className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
+        className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded font-semibold transition duration-200 shadow-lg animate-slide-up"
       >
         💾 Save to Firebase
       </button>

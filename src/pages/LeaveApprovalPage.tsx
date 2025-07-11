@@ -237,7 +237,7 @@ export default function LeaveApprovalsPage() {
     req.userId.toLowerCase().includes(searchTerm.toLowerCase());
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto text-gray-900 dark:text-gray-200 transition-all duration-500">
       <h2 className="text-3xl font-bold mb-4 text-center">
         📋 Leave Approvals
       </h2>
@@ -248,7 +248,7 @@ export default function LeaveApprovalsPage() {
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="border px-3 py-1 rounded"
+            className="border px-3 py-1 rounded bg-white dark:bg-gray-800 dark:text-gray-100"
           >
             {generateMonthOptions().map((month) => (
               <option key={month} value={month}>
@@ -264,34 +264,43 @@ export default function LeaveApprovalsPage() {
             placeholder="Search by Name or Employee ID"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full border px-3 py-2 rounded"
+            className="w-full border px-3 py-2 rounded bg-white dark:bg-gray-800 dark:text-gray-100"
           />
         </div>
       </div>
 
-      {/* --- Pending Requests --- */}
+      {/* Pending Requests */}
       <h3 className="text-xl font-semibold mb-2">⏳ Pending Requests</h3>
       {leaveRequests.filter(filterBySearch).length === 0 ? (
         <p className="text-gray-500 text-center mb-6">No pending requests.</p>
       ) : (
-        <div className="overflow-x-auto mb-10">
-          <table className="min-w-full table-auto border border-gray-300 text-sm">
-            <thead className="bg-gray-100">
+        <div className="overflow-x-auto mb-10 animate-fade-in-up transition-all duration-500">
+          <table className="min-w-[900px] w-full border border-gray-300 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 shadow-md rounded-lg">
+            <thead className="bg-gray-100 dark:bg-gray-700">
               <tr>
-                <th className="border px-4 py-2">Emp ID</th>
-                <th className="border px-4 py-2">Name</th>
-                <th className="border px-4 py-2">Phone</th>
-                <th className="border px-4 py-2">Date</th>
-                <th className="border px-4 py-2">Leave Type</th>
-                <th className="border px-4 py-2">Extra Leave</th>
-                <th className="border px-4 py-2">Reason</th>
-                <th className="border px-4 py-2">HR Comment</th>
-                <th className="border px-4 py-2">Actions</th>
+                {[
+                  "Emp ID",
+                  "Name",
+                  "Phone",
+                  "Date",
+                  "Leave Type",
+                  "Extra Leave",
+                  "Reason",
+                  "HR Comment",
+                  "Actions",
+                ].map((head, i) => (
+                  <th key={i} className="border px-4 py-2">
+                    {head}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {leaveRequests.filter(filterBySearch).map((req) => (
-                <tr key={req.id} className="text-center">
+                <tr
+                  key={req.id}
+                  className="text-center hover:bg-sky-50 dark:hover:bg-gray-700 transition"
+                >
                   <td className="border px-4 py-2">{req.userId}</td>
                   <td className="border px-4 py-2">{req.name}</td>
                   <td className="border px-4 py-2">{req.phone}</td>
@@ -312,7 +321,7 @@ export default function LeaveApprovalsPage() {
                           [req.id]: e.target.value,
                         }))
                       }
-                      className="w-full border p-1 rounded"
+                      className="w-full border p-1 rounded bg-white dark:bg-gray-700 dark:text-white"
                       rows={2}
                     />
                   </td>
@@ -337,62 +346,68 @@ export default function LeaveApprovalsPage() {
         </div>
       )}
 
-      {/* --- History Section --- */}
+      {/* History */}
       <h3 className="text-xl font-semibold mb-2">📜 Leave History</h3>
-      {historyRequests.filter(filterBySearch).length === 0 ? (
-        <p className="text-gray-500 text-center">No leave history found.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full table-auto border border-gray-300 text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="border px-4 py-2">Emp ID</th>
-                <th className="border px-4 py-2">Name</th>
-                <th className="border px-4 py-2">Phone</th>
-                <th className="border px-4 py-2">Date</th>
-                <th className="border px-4 py-2">Leave Type</th>
-                <th className="border px-4 py-2">Extra Leave</th>
-                <th className="border px-4 py-2">Reason</th>
-                <th className="border px-4 py-2">Status</th>
-                <th className="border px-4 py-2">Comment</th>
-              </tr>
-            </thead>
-            <tbody>
-              {historyRequests.filter(filterBySearch).map((req) => (
-                <tr key={req.id} className="text-center">
-                  <td className="border px-4 py-2">{req.userId}</td>
-                  <td className="border px-4 py-2">{req.name}</td>
-                  <td className="border px-4 py-2">{req.phone}</td>
-                  <td className="border px-4 py-2">{req.date}</td>
-                  <td className="border px-4 py-2">
-                    {req.leaveType || "Regular"}
-                  </td>
-                  <td className="border px-4 py-2">
-                    {req.isExtra ? "✅" : "❌"}
-                  </td>
-                  <td className="border px-4 py-2">{req.reason}</td>
-                  <td className="border px-4 py-2 capitalize">{req.status}</td>
-                  <td className="border px-4 py-2">{req.hrComment || "-"}</td>
-                </tr>
+      <div className="overflow-x-auto">
+        <table className="min-w-full table-auto border border-gray-300 text-sm bg-white dark:bg-gray-800 dark:text-gray-100">
+          <thead className="bg-gray-100 dark:bg-gray-700">
+            <tr>
+              {[
+                "Emp ID",
+                "Name",
+                "Phone",
+                "Date",
+                "Leave Type",
+                "Extra Leave",
+                "Reason",
+                "Status",
+                "Comment",
+              ].map((head, i) => (
+                <th key={i} className="border px-4 py-2">
+                  {head}
+                </th>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </tr>
+          </thead>
+          <tbody>
+            {historyRequests.filter(filterBySearch).map((req) => (
+              <tr
+                key={req.id}
+                className="text-center hover:bg-sky-50 dark:hover:bg-gray-700 transition"
+              >
+                <td className="border px-4 py-2">{req.userId}</td>
+                <td className="border px-4 py-2">{req.name}</td>
+                <td className="border px-4 py-2">{req.phone}</td>
+                <td className="border px-4 py-2">{req.date}</td>
+                <td className="border px-4 py-2">
+                  {req.leaveType || "Regular"}
+                </td>
+                <td className="border px-4 py-2">
+                  {req.isExtra ? "✅" : "❌"}
+                </td>
+                <td className="border px-4 py-2">{req.reason}</td>
+                <td className="border px-4 py-2 capitalize">{req.status}</td>
+                <td className="border px-4 py-2">{req.hrComment || "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <Modal
         isOpen={showEmailModal}
         onRequestClose={() => setShowEmailModal(false)}
-        className="max-w-lg mx-auto mt-20 bg-white p-6 rounded shadow"
+        className="max-w-lg mx-auto mt-20 bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg animate-fade-in-up text-gray-900 dark:text-white"
       >
-        <h2 className="text-xl font-semibold mb-2">
-          Edit Email Before Sending
+        <h2 className="text-xl font-semibold mb-4 text-blue-700 dark:text-blue-400">
+          ✉️ Edit Email Before Sending
         </h2>
         <label className="block mb-1 font-medium">To:</label>
         <input
           type="email"
           value={emailTo}
           disabled
-          className="w-full mb-3 border px-3 py-2 rounded bg-gray-100"
+          className="w-full mb-3 border px-3 py-2 rounded bg-gray-100 dark:bg-gray-800"
         />
 
         <label className="block mb-1 font-medium">Subject:</label>
@@ -400,7 +415,7 @@ export default function LeaveApprovalsPage() {
           type="text"
           value={emailSubject}
           onChange={(e) => setEmailSubject(e.target.value)}
-          className="w-full mb-3 border px-3 py-2 rounded"
+          className="w-full mb-3 border px-3 py-2 rounded bg-white dark:bg-gray-800"
         />
 
         <label className="block mb-1 font-medium">Message:</label>
@@ -408,7 +423,7 @@ export default function LeaveApprovalsPage() {
           rows={6}
           value={emailBody}
           onChange={(e) => setEmailBody(e.target.value)}
-          className="w-full mb-3 border px-3 py-2 rounded"
+          className="w-full mb-3 border px-3 py-2 rounded bg-white dark:bg-gray-800"
         />
 
         <div className="flex justify-end gap-2">
@@ -420,7 +435,7 @@ export default function LeaveApprovalsPage() {
           </button>
           <button
             onClick={sendEmail}
-            className="px-4 py-2 rounded bg-green-600 text-white"
+            className="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white"
           >
             Send Email
           </button>

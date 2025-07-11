@@ -1,4 +1,3 @@
-// Enhanced ChatPage with sidebar for global, private, and group chats + group creation
 import React, { useEffect, useState, useRef } from "react";
 import {
   collection,
@@ -123,10 +122,11 @@ export default function ChatPage() {
         ? `privateChats/${chatId}`
         : `groupChats/${chatId}`;
     const snap = await getDocs(collection(db, `${base}/messages`));
-    const batchDelete = snap.docs.map((docSnap) =>
-      deleteDoc(doc(db, `${base}/messages/${docSnap.id}`))
+    await Promise.all(
+      snap.docs.map((docSnap) =>
+        deleteDoc(doc(db, `${base}/messages/${docSnap.id}`))
+      )
     );
-    await Promise.all(batchDelete);
     alert("Chat history cleared.");
   };
 
@@ -186,11 +186,10 @@ export default function ChatPage() {
   const createGroup = async () => {
     if (!groupName.trim() || selectedMembers.length === 0) return;
     const id = uuidv4();
-    const groupData = {
+    await setDoc(doc(db, "groupChatsMeta", id), {
       name: groupName,
       members: [...selectedMembers, user?.uid],
-    };
-    await setDoc(doc(db, "groupChatsMeta", id), groupData);
+    });
     setGroupName("");
     setSelectedMembers([]);
     setShowGroupForm(false);
@@ -210,8 +209,9 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="flex flex-col md:flex-row h-screen">
-      <div className="w-full md:w-1/4 p-4 border-r bg-white">
+    <div className="flex flex-col md:flex-row h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+      {/* Sidebar */}
+      <div className="w-full md:w-1/4 p-4 border-r bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-800 dark:text-gray-100">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Chats</h2>
           <button
@@ -221,13 +221,14 @@ export default function ChatPage() {
             <Plus className="w-4 h-4" /> Group
           </button>
         </div>
+
         {showGroupForm && (
-          <div className="mb-4 border p-2 rounded">
+          <div className="mb-4 border p-2 rounded bg-gray-100 dark:bg-gray-700 animate-slideUp">
             <input
               placeholder="Group Name"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              className="w-full border px-2 py-1 mb-2 rounded"
+              className="w-full border px-2 py-1 mb-2 rounded dark:bg-gray-800 dark:border-gray-600 dark:text-white"
             />
             <div className="max-h-40 overflow-y-auto">
               {employees.map((emp) => (
@@ -244,7 +245,7 @@ export default function ChatPage() {
             </div>
             <button
               onClick={createGroup}
-              className="mt-2 w-full bg-green-600 text-white py-1 rounded"
+              className="mt-2 w-full bg-green-600 text-white py-1 rounded hover:bg-green-700 transition"
             >
               Create Group
             </button>
@@ -256,14 +257,14 @@ export default function ChatPage() {
           placeholder="Search..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-3 py-2 mb-4 border rounded"
+          className="w-full px-3 py-2 mb-4 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         />
 
         <button
           onClick={() =>
             handleChatSwitch("global", "globalRoom", "Global Chat")
           }
-          className="flex items-center gap-2 w-full py-2 px-3 rounded hover:bg-gray-100"
+          className="flex items-center gap-2 w-full py-2 px-3 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition"
         >
           <Globe className="w-4 h-4" /> Global Chat
           {unreadCounts["globalRoom"] > 0 && (
@@ -271,37 +272,34 @@ export default function ChatPage() {
           )}
         </button>
 
-        <p className="mt-4 font-medium text-gray-700">Private Chats</p>
+        <p className="mt-4 font-medium">Private Chats</p>
         <div className="max-h-60 overflow-y-auto">
-          {filteredEmployees.map((emp) => (
-            <button
-              key={emp.id}
-              onClick={() =>
-                handleChatSwitch(
-                  "private",
-                  [user?.uid, emp.id].sort().join("_"),
-                  emp.name
-                )
-              }
-              className="flex items-center gap-2 w-full py-2 px-3 rounded hover:bg-gray-100"
-            >
-              <Users className="w-4 h-4" /> {emp.name}
-              {unreadCounts[[user?.uid, emp.id].sort().join("_")] > 0 && (
-                <span className="ml-auto text-xs text-red-600 font-bold">
-                  🔴
-                </span>
-              )}
-            </button>
-          ))}
+          {filteredEmployees.map((emp) => {
+            const pid = [user?.uid, emp.id].sort().join("_");
+            return (
+              <button
+                key={emp.id}
+                onClick={() => handleChatSwitch("private", pid, emp.name)}
+                className="flex items-center gap-2 w-full py-2 px-3 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+              >
+                <Users className="w-4 h-4" /> {emp.name}
+                {unreadCounts[pid] > 0 && (
+                  <span className="ml-auto text-xs text-red-600 font-bold">
+                    🔴
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        <p className="mt-4 font-medium text-gray-700">Group Chats</p>
+        <p className="mt-4 font-medium">Group Chats</p>
         <div className="max-h-60 overflow-y-auto">
           {filteredGroups.map((grp) => (
             <button
               key={grp.id}
               onClick={() => handleChatSwitch("group", grp.id, grp.name)}
-              className="flex items-center gap-2 w-full py-2 px-3 rounded hover:bg-gray-100"
+              className="flex items-center gap-2 w-full py-2 px-3 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition"
             >
               <MessageCircle className="w-4 h-4" /> {grp.name}
               {unreadCounts[grp.id] > 0 && (
@@ -314,28 +312,28 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Chat UI remains unchanged */}
-      <div className="flex-1 p-4 flex flex-col bg-gray-50">
-        <h2 className="text-xl font-semibold mb-2 text-center">
+      {/* Chat pane */}
+      <div className="flex-1 p-4 flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100">
+        <h2 className="text-xl font-semibold mb-2 text-center animate-fade">
           💬 {activeChatName}
         </h2>
-        <div className="flex-1 overflow-y-auto px-2">
+        <div className="flex-1 overflow-y-auto px-2 space-y-1">
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`relative p-2 my-1 rounded max-w-xs ${
+              className={`relative p-2 rounded max-w-xs animate-fade ${
                 msg.sender === user?.uid
-                  ? "ml-auto bg-blue-200 text-right"
-                  : "mr-auto bg-green-200 text-left"
+                  ? "ml-auto bg-blue-200 dark:bg-blue-700 text-right"
+                  : "mr-auto bg-green-200 dark:bg-green-700 text-left"
               }`}
             >
               <div className="text-sm font-semibold">{msg.senderName}</div>
               {editingId === msg.id ? (
-                <div>
+                <>
                   <input
                     value={editingText}
                     onChange={(e) => setEditingText(e.target.value)}
-                    className="border rounded px-2 py-1 w-full"
+                    className="border rounded px-2 py-1 w-full dark:bg-gray-800 dark:text-white dark:border-gray-600"
                   />
                   <button
                     onClick={() => updateMessage(msg.id)}
@@ -343,11 +341,11 @@ export default function ChatPage() {
                   >
                     Save
                   </button>
-                </div>
+                </>
               ) : (
-                <div>
+                <>
                   <div>{msg.text}</div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
                     {formatTimestamp(msg.timestamp)}
                   </div>
                   {msg.sender === user?.uid && (
@@ -365,7 +363,7 @@ export default function ChatPage() {
                       </button>
                     </div>
                   )}
-                </div>
+                </>
               )}
             </div>
           ))}
@@ -380,11 +378,11 @@ export default function ChatPage() {
               e.key === "Enter" && newMsg.trim() && sendMessage()
             }
             placeholder="Type a message..."
-            className="flex-1 border px-3 py-2 rounded shadow"
+            className="flex-1 border px-3 py-2 rounded shadow dark:bg-gray-800 dark:text-white dark:border-gray-600"
           />
           <button
             onClick={sendMessage}
-            className="bg-blue-600 text-white px-4 py-2 rounded shadow"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow transition"
           >
             Send
           </button>
@@ -393,7 +391,7 @@ export default function ChatPage() {
         <div className="text-right mt-2">
           <button
             onClick={clearChatHistory}
-            className="text-red-600 text-sm underline"
+            className="text-red-600 dark:text-red-400 text-sm underline"
           >
             Clear Chat History
           </button>

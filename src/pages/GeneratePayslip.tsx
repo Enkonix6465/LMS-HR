@@ -1,20 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import { getDoc, doc, getDocs, collection, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { collection, getDocs, doc, getDoc, setDoc } from "firebase/firestore";
 
-const PayslipForm = () => {
+const PayslipGenerator = () => {
   const [employees, setEmployees] = useState([]);
   const [selectedId, setSelectedId] = useState("");
+  const [month, setMonth] = useState("");
+  const [penaltyPerDay, setPenaltyPerDay] = useState(200);
+  const [notes, setNotes] = useState("");
+  const [summary, setSummary] = useState(null);
+  const [salary, setSalary] = useState(null);
   const [employee, setEmployee] = useState(null);
-  const [attendanceSummary, setAttendanceSummary] = useState(null);
-  const [salaryDetails, setSalaryDetails] = useState({});
-  const [form, setForm] = useState({
-    month: "",
-    notes: "",
-    taxPercent: 5,
-    latePenalty: 200,
-  });
-  const [showPreview, setShowPreview] = useState(false);
+  const [payslipData, setPayslipData] = useState(null);
+  const payslipRef = useRef();
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -24,434 +24,391 @@ const PayslipForm = () => {
     fetchEmployees();
   }, []);
 
-  const convertTimeToDecimal = (timeStr) => {
+  const convertToHoursDecimal = (timeStr) => {
     if (!timeStr) return 0;
-    const match = timeStr.match(/(\d+)h\s+(\d+)m\s+(\d+)s/);
-    if (!match) return 0;
-    const [_, h, m, s] = match.map(Number);
+    const [h, m, s] = timeStr.split(/[hms]+/).map((v) => parseInt(v) || 0);
     return h + m / 60 + s / 3600;
   };
 
-  useEffect(() => {
-    const fetchDetails = async () => {
-      const emp = employees.find((e) => e.id === selectedId);
-      if (!emp) return;
+  const handlePreview = async () => {
+    if (!selectedId || !month) return alert("Please fill all fields");
 
-      setEmployee(emp);
+    const [empSnap, salarySnap, summarySnap] = await Promise.all([
+      getDoc(doc(db, "employees", selectedId)),
+      getDoc(doc(db, "salary", selectedId)),
+      getDoc(doc(db, "attendanceSummary", `${selectedId}_${month}`)),
+    ]);
 
-      const month = form.month || new Date().toISOString().slice(0, 7);
+    const emp = empSnap.data();
+    const salaryData = salarySnap.data();
+    const summaryData = summarySnap.data();
 
-      const [attendanceSnap, salarySnap] = await Promise.all([
-        getDoc(doc(db, "attendanceSummary", `${emp.id}_${month}`)),
-        getDoc(doc(db, "salary", emp.id)),
-      ]);
+    if (!emp || !salaryData || !summaryData)
+      return alert("Required data missing");
 
-      const attendance = attendanceSnap.exists() ? attendanceSnap.data() : null;
-      const salary = salarySnap.exists() ? salarySnap.data() : null;
+    setEmployee(emp);
+    setSalary(salaryData);
+    setSummary(summaryData);
 
-      setAttendanceSummary(attendance);
+    const base = parseFloat(salaryData.basicSalary || 0);
+    const hra = parseFloat(salaryData.houseRentAllowance || 0);
+    const da = parseFloat(salaryData.dearnessAllowance || 0);
+    const convey = parseFloat(salaryData.conveyanceAllowance || 0);
+    const med = parseFloat(salaryData.medicalAllowance || 0);
+    const spec = parseFloat(salaryData.specialAllowance || 0);
+    const overtime = parseFloat(salaryData.overtimePay || 0);
+    const incent = parseFloat(salaryData.incentives || 0);
+    const other = parseFloat(salaryData.otherAllowances || 0);
 
-      if (salary) {
-        const basic = parseFloat(salary.basicSalary || 0);
-        const hra = parseFloat(salary.houseRentAllowance || 0);
-        const da = parseFloat(salary.dearnessAllowance || 0);
-        const conveyance = parseFloat(salary.conveyanceAllowance || 0);
-        const medical = parseFloat(salary.medicalAllowance || 0);
-        const special = parseFloat(salary.specialAllowance || 0);
-        const overtime = parseFloat(salary.overtimePay || 0);
-        const incentives = parseFloat(salary.incentives || 0);
-        const other = parseFloat(salary.otherAllowances || 0);
+    const gross =
+      base + hra + da + convey + med + spec + overtime + incent + other;
 
-        const gross =
-          basic +
-          hra +
-          da +
-          conveyance +
-          medical +
-          special +
-          overtime +
-          incentives +
-          other;
+    const workedHrs = convertToHoursDecimal(summaryData.totalmonthHours);
+    const extraHrs = Object.values(summaryData.extraWorkLog || {}).reduce(
+      (sum, val) => sum + convertToHoursDecimal(val),
+      0
+    );
 
-        const totalHours = convertTimeToDecimal(
-          attendance?.totalmonthHours || "0h 0m 0s"
-        );
-        const standardMonthlyHours = 198;
-        const hourRatio = Math.min(totalHours / standardMonthlyHours, 1);
-        const grossAdjusted = gross * hourRatio;
+    const totalHrs = workedHrs + extraHrs;
+    const stdHrs = summaryData.totalWorkingDays * 9;
+    const hourRatio = Math.min(totalHrs / stdHrs, 1);
 
-        const tax = grossAdjusted * (form.taxPercent / 100);
-        const penalty = (attendance?.absentDays || 0) * form.latePenalty;
-        const netSalary = grossAdjusted - tax - penalty;
+    const adjusted = gross * hourRatio;
+    const extraPay = gross * (extraHrs / stdHrs);
+    const pf = parseFloat(salaryData.providentFund || 0);
+    const proTax = parseFloat(salaryData.professionalTax || 0);
+    const incomeTax = parseFloat(salaryData.incomeTax || 0);
+    const penalty = (summaryData.absentDays || 0) * penaltyPerDay;
 
-        setSalaryDetails({
-          ...salary,
-          grossSalary: gross,
-          grossAdjusted,
-          netSalary,
-          workedHours: totalHours,
-          hourRatio: hourRatio.toFixed(2),
-          tax,
-          penalty,
-        });
-      } else {
-        setSalaryDetails({});
-      }
+    const deductions = pf + proTax + incomeTax + penalty;
+    const net = adjusted + extraPay - deductions;
+
+    const finalData = {
+      gross,
+      adjusted,
+      extraPay,
+      pf,
+      proTax,
+      incomeTax,
+      penalty,
+      deductions,
+      net,
+      stdHrs,
+      totalHrs,
+      extraHrs,
+      presentDays: summaryData.presentDays,
+      absentDays: summaryData.absentDays,
+      leavesTaken: summaryData.leavesTaken,
+      totalWorkingDays: summaryData.totalWorkingDays,
+      totalWorkedHours: totalHrs.toFixed(2),
+      employeeId: selectedId,
+      name: emp.name,
+      email: emp.email,
+      phone: emp.phone,
+      department: emp.department,
+      month,
+      notes,
+      accountHolderName: salaryData.accountHolderName,
+      accountNumber: salaryData.accountNumber,
+      bankName: salaryData.bankName,
+      ifscCode: salaryData.ifscCode,
+      panNumber: salaryData.panNumber,
+      esicNumber: salaryData.esicNumber,
+      uan: salaryData.uan,
+      createdAt: new Date().toISOString(),
     };
 
-    if (selectedId) fetchDetails();
-  }, [selectedId, form.month, form.taxPercent, form.latePenalty, employees]);
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setPayslipData(finalData);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setShowPreview(true);
-  };
+  useEffect(() => {
+    if (payslipData) {
+      const savePayslipHTML = async () => {
+        const payslipHTML = payslipRef.current?.outerHTML || "";
+        const finalPayslip = { ...payslipData, payslipHTML };
+        await setDoc(
+          doc(
+            db,
+            "salaryDetails",
+            `${payslipData.employeeId}_${payslipData.month}`
+          ),
+          finalPayslip
+        );
+      };
+      savePayslipHTML();
+    }
+  }, [payslipData]);
 
-  const confirmSubmit = async () => {
-    const docRef = doc(db, "salaryDetails", `${selectedId}_${form.month}`);
-    await setDoc(docRef, {
-      employeeId: selectedId,
-      name: employee.name,
-      email: employee.email,
-      phone: employee.phone,
-      department: employee.department,
-      month: form.month,
-      ...salaryDetails,
-      presentDays: attendanceSummary?.presentDays || 0,
-      absentDays: attendanceSummary?.absentDays || 0,
-      leavesTaken: attendanceSummary?.leavesTaken || 0,
-      totalWorkingDays: attendanceSummary?.totalWorkingDays || 0,
-      totalWorkedHours: salaryDetails.workedHours,
-      notes: form.notes,
-      createdAt: new Date().toISOString(),
-    });
-
-    alert("Payslip submitted successfully!");
-    setForm({ month: "", notes: "", taxPercent: 5, latePenalty: 200 });
-    setSelectedId("");
-    setEmployee(null);
-    setAttendanceSummary(null);
-    setSalaryDetails({});
-    setShowPreview(false);
+  const downloadPDF = async () => {
+    const canvas = await html2canvas(payslipRef.current);
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF();
+    pdf.addImage(imgData, "PNG", 10, 10, 190, 0);
+    pdf.save("payslip.pdf");
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white rounded-2xl shadow-md mt-6">
-      <h2 className="text-2xl font-bold mb-4 text-center">Generate Payslip</h2>
+    <div className="max-w-4xl mx-auto p-4 transition-colors duration-500 dark:bg-gray-900 dark:text-white bg-white text-black min-h-screen">
+      <h2 className="text-center text-xl font-bold mb-4 text-blue-700 dark:text-blue-300 transition-all duration-300">
+        Auto Payslip Generator
+      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <img src="/logo.jpg" alt="Company Logo" className="h-16" />
+        <div className="text-right">
+          <p className="text-sm font-semibold text-gray-700">
+            Enkonix Software Services Pvt Ltd
+          </p>
+          <p className="text-xs text-gray-500">Banglore, Novel Office.</p>
+          <p className="text-xs text-gray-500">hr@enkonix.in</p>
+        </div>
+      </div>
+      <h2 className="text-center text-lg font-bold mb-2">Payslip</h2>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="font-semibold">Select Employee</label>
-          <select
-            className="w-full p-2 border rounded"
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            required
+      <select
+        className="w-full border p-2 mb-3 rounded"
+        value={selectedId}
+        onChange={(e) => setSelectedId(e.target.value)}
+      >
+        <option value="">Select Employee</option>
+        {employees.map((e) => (
+          <option key={e.id} value={e.id}>
+            {e.name} ({e.email})
+          </option>
+        ))}
+      </select>
+
+      <input
+        type="month"
+        className="w-full border p-2 mb-3 rounded"
+        value={month}
+        onChange={(e) => setMonth(e.target.value)}
+      />
+
+      <input
+        type="number"
+        className="w-full border p-2 mb-3 rounded"
+        placeholder="Penalty per Absence"
+        value={penaltyPerDay}
+        onChange={(e) => setPenaltyPerDay(Number(e.target.value))}
+      />
+
+      <textarea
+        className="w-full border p-2 mb-3 rounded"
+        placeholder="Notes"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+      />
+
+      <button
+        className="bg-blue-600 hover:bg-blue-700 transition-all duration-300 text-white px-4 py-2 rounded w-full"
+        onClick={handlePreview}
+      >
+        Preview Payslip
+      </button>
+
+      {employee && salary && summary && payslipData && (
+        <>
+          <div
+            className="mt-6 animate-fade-in"
+            style={{ animation: "fadeIn 0.5s ease-in-out" }}
           >
-            <option value="">-- Select Employee --</option>
-            {employees.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {emp.name} ({emp.email})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <input
-            type="number"
-            name="taxPercent"
-            value={form.taxPercent}
-            onChange={handleChange}
-            className="p-2 border rounded"
-            placeholder="Tax %"
-          />
-          <input
-            type="number"
-            name="latePenalty"
-            value={form.latePenalty}
-            onChange={handleChange}
-            className="p-2 border rounded"
-            placeholder="Penalty per Absence"
-          />
-        </div>
-
-        <div>
-          <label className="font-semibold">Month (YYYY-MM)</label>
-          <input
-            type="month"
-            name="month"
-            value={form.month}
-            onChange={handleChange}
-            required
-            className="w-full p-2 border rounded"
-          />
-        </div>
-
-        <div>
-          <label className="font-semibold">Notes (optional)</label>
-          <textarea
-            name="notes"
-            value={form.notes}
-            onChange={handleChange}
-            rows={3}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-
-        <div className="text-xl font-bold text-center mt-4">
-          Net Salary (After Tax & Penalty): ₹{" "}
-          {salaryDetails.netSalary?.toFixed(2) || 0}
-        </div>
-
-        <button
-          type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded"
-        >
-          Preview Payslip
-        </button>
-      </form>
-
-      {showPreview && (
-        <div className="bg-white border border-gray-300 p-6 mt-6 rounded-2xl shadow-lg max-w-5xl mx-auto">
-          <h3 className="text-3xl font-bold mb-4 text-center text-gray-800">
-            Payslip
-          </h3>
-          <p className="text-center text-sm text-gray-500 mb-2">
-            Enkonix Software Services
-          </p>
-          <p className="text-center text-sm text-gray-500 mb-6">
-            21023 Pearson Point Road, Gateway Avenue
-          </p>
-
-          <div className="grid grid-cols-2 gap-4 text-sm mb-6">
-            <div>
-              <p>
-                <strong>Date of Joining:</strong> {employee?.joiningDate || "-"}
-              </p>
-              <p>
-                <strong>Pay Period:</strong> {form.month}
-              </p>
-              <p>
-                <strong>Total Working Days:</strong>{" "}
-                {attendanceSummary?.totalWorkingDays || 0}
-              </p>
-              <p>
-                <strong>Leaves Taken:</strong>{" "}
-                {attendanceSummary?.leavesTaken || 0}
-              </p>
-              <p>
-                <strong>Present Days:</strong>{" "}
-                {attendanceSummary?.presentDays || 0}
-              </p>
-            </div>
-            <div>
-              <p>
-                <strong>Employee Name:</strong> {employee?.name}
-              </p>
-              <p>
-                <strong>Designation:</strong> {employee?.title}
-              </p>
-              <p>
-                <strong>Department:</strong> {employee?.department}
-              </p>
-              <p>
-                <strong>Worked Hours:</strong>{" "}
-                {salaryDetails.workedHours?.toFixed(2)} hrs
-              </p>
-              <p>
-                <strong>Total Standard Hours:</strong> 198 hrs
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6">
-            {/* Earnings Table */}
-            <table className="w-full border border-gray-300">
-              <thead className="bg-gray-200">
-                <tr>
-                  <th className="p-2 border">Earnings</th>
-                  <th className="p-2 border">Amount (₹)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { label: "Basic", value: salaryDetails.basicSalary },
-                  {
-                    label: "House Rent Allowance",
-                    value: salaryDetails.houseRentAllowance,
-                  },
-                  {
-                    label: "Dearness Allowance",
-                    value: salaryDetails.dearnessAllowance,
-                  },
-                  {
-                    label: "Conveyance Allowance",
-                    value: salaryDetails.conveyanceAllowance,
-                  },
-                  {
-                    label: "Medical Allowance",
-                    value: salaryDetails.medicalAllowance,
-                  },
-                  {
-                    label: "Special Allowance",
-                    value: salaryDetails.specialAllowance,
-                  },
-                  { label: "Overtime Pay", value: salaryDetails.overtimePay },
-                  { label: "Incentives", value: salaryDetails.incentives },
-                  {
-                    label: "Other Allowances",
-                    value: salaryDetails.otherAllowances,
-                  },
-                ].map((item) => (
-                  <tr key={item.label}>
-                    <td className="p-2 border">{item.label}</td>
-                    <td className="p-2 border">
-                      {parseFloat(item.value || 0).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-gray-100 font-semibold">
-                  <td className="p-2 border">Total Earnings</td>
-                  <td className="p-2 border">
-                    ₹{salaryDetails.grossSalary?.toFixed(2)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            {/* Deductions Table */}
-            <table className="w-full border border-gray-300">
-              <thead className="bg-gray-200">
-                <tr>
-                  <th className="p-2 border">Deductions</th>
-                  <th className="p-2 border">Amount (₹)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="p-2 border">Tax</td>
-                  <td className="p-2 border">
-                    {salaryDetails.tax?.toFixed(2)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-2 border">
-                    Penalty for {attendanceSummary?.absentDays || 0} days
-                  </td>
-                  <td className="p-2 border">
-                    {salaryDetails.penalty?.toFixed(2)}
-                  </td>
-                </tr>
-                <tr className="bg-gray-100 font-semibold">
-                  <td className="p-2 border">Total Deductions</td>
-                  <td className="p-2 border">
-                    ₹
-                    {(
-                      parseFloat(salaryDetails.tax || 0) +
-                      parseFloat(salaryDetails.penalty || 0)
-                    ).toFixed(2)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Bank Details Section */}
-          <div className="grid grid-cols-2 gap-6 mt-8">
-            <table className="w-full border border-gray-300">
-              <thead className="bg-blue-100">
-                <tr>
-                  <th className="p-2 border text-left" colSpan="2">
-                    Bank & Account Details
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="text-sm">
-                <tr>
-                  <td className="p-2 border w-1/2">Account Holder Name</td>
-                  <td className="p-2 border">
-                    {salaryDetails.accountHolderName || "-"}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-2 border">Account Number</td>
-                  <td className="p-2 border">
-                    {salaryDetails.accountNumber || "-"}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-2 border">Bank Name</td>
-                  <td className="p-2 border">
-                    {salaryDetails.bankName || "-"}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-2 border">IFSC Code</td>
-                  <td className="p-2 border">
-                    {salaryDetails.ifscCode || "-"}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-2 border">PAN Number</td>
-                  <td className="p-2 border">
-                    {salaryDetails.panNumber || "-"}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-2 border">ESIC</td>
-                  <td className="p-2 border">
-                    {salaryDetails.esicNumber || "N/A"}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-2 border">UAN</td>
-                  <td className="p-2 border">{salaryDetails.uan || "N/A"}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className="text-center mt-6">
-            <h4 className="text-xl font-bold">
-              Net Pay: ₹{salaryDetails.netSalary?.toFixed(2)}
-            </h4>
-            <p className="text-sm italic text-gray-500">
-              {salaryDetails.netSalaryInWords || "Net Salary in Words"}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 text-center text-sm mt-10">
-            <div>
-              <p>Employer Signature</p>
-              <hr className="mt-6 border-t border-gray-400 w-3/4 mx-auto" />
-            </div>
-            <div>
-              <p>Employee Signature</p>
-              <hr className="mt-6 border-t border-gray-400 w-3/4 mx-auto" />
-            </div>
-          </div>
-
-          <p className="text-center text-xs mt-4 text-gray-500">
-            This is a system generated payslip
-          </p>
-
-          <div className="text-center mt-6">
-            <button
-              onClick={confirmSubmit}
-              className="bg-green-600 text-white font-semibold px-6 py-2 rounded shadow hover:bg-green-700"
+            <div
+              ref={payslipRef}
+              className="relative mt-6 bg-white dark:bg-gray-800 p-4 rounded shadow border border-gray-400 text-sm w-full overflow-hidden transition-colors duration-500"
             >
-              Confirm & Save Payslip
-            </button>
+              {/* Background watermark layer */}
+              <div
+                className="absolute inset-0 z-0 pointer-events-none"
+                style={{
+                  backgroundImage: 'url("/log1.png")',
+                  backgroundRepeat: "repeat",
+                  backgroundSize: "120px",
+                  transform: "rotate(-45deg)", // ✅ diagonal direction
+                  transformOrigin: "center",
+                  opacity: 0.06, // ✅ very light
+                }}
+              ></div>
+
+              {/* Payslip content layer */}
+              <div className="relative z-10">
+                {/* 🔽 Your entire existing payslip layout goes here 🔽 */}
+
+                {/* Example */}
+
+                {/* Header */}
+                <div
+                  className="text-white text-sm font-semibold p-2 flex items-center justify-between"
+                  style={{ backgroundColor: "#f3cfb9" }}
+                >
+                  <div className="flex items-center gap-3">
+                    <img
+                      src="/logo.jpg"
+                      alt="Enkonix Logo"
+                      className="h-12 w-auto"
+                    />
+                    <p className="text-black font-bold text-lg">
+                      ENKONIX SOFTWARE SERVICES PVT LTD
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="border-x border-b border-gray-400 text-center font-semibold py-2">
+                Payslip For{" "}
+                {new Date(month + "-01")
+                  .toLocaleString("default", { month: "long", year: "numeric" })
+                  .toUpperCase()}
+              </div>
+
+              {/* Top Details Grid */}
+              <div className="grid grid-cols-2 border border-gray-400 border-t-0 divide-x divide-gray-400">
+                <div className="divide-y divide-gray-400">
+                  {[
+                    ["Personnel No.", employee.id],
+                    ["Bank", salary.bankName],
+                    ["DOJ", employee.joiningDate],
+                    ["PF No.", salary.uan || "-"],
+                    ["Location", employee.location || "-"],
+                    ["Department", employee.department || "-"],
+                  ].map(([label, value]) => (
+                    <div className="grid grid-cols-2" key={label}>
+                      <div
+                        className="font-semibold p-1 border-r border-gray-300 text-white"
+                        style={{ backgroundColor: "#76bce4" }}
+                      >
+                        {label}
+                      </div>
+                      <div className="p-1">{value || "-"}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="divide-y divide-gray-400">
+                  {[
+                    ["Name", employee.name],
+                    ["Bank A/c No.", salary.accountNumber],
+                    ["LOP Days", summary.absentDays || 0],
+                    ["STD Days", summary.totalWorkingDays || 0],
+                    ["Worked Days", summary.presentDays || 0],
+                    ["Designation", employee.title || "-"],
+                  ].map(([label, value]) => (
+                    <div className="grid grid-cols-2" key={label}>
+                      <div
+                        className="font-semibold p-1 border-r border-gray-300 text-white"
+                        style={{ backgroundColor: "#76bce4" }}
+                      >
+                        {label}
+                      </div>
+                      <div className="p-1">{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Earnings & Deductions */}
+              <div className="grid grid-cols-2 mt-4 border border-gray-400">
+                <table className="w-full border-r border-gray-400">
+                  <thead
+                    className="font-semibold p-1 border-r border-gray-300 text-white"
+                    style={{ backgroundColor: "#76bce4" }}
+                  >
+                    <tr>
+                      <th className="border border-gray-300 p-1 text-left">
+                        Earnings
+                      </th>
+                      <th className="border border-gray-300 p-1 text-right">
+                        Amount in Rs.
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["BASIC", salary.basicSalary],
+                      ["HOUSE RENT ALLOWANCE", salary.houseRentAllowance],
+                      ["SPECIAL ALLOWANCE", salary.specialAllowance],
+                      ["HOT SKILL BONUS", salary.otherAllowances],
+                    ].map(([label, val]) => (
+                      <tr key={label}>
+                        <td className="border border-gray-300 p-1">{label}</td>
+                        <td className="border border-gray-300 p-1 text-right">
+                          {parseFloat(val || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="font-bold">
+                      <td className="border border-gray-300 p-1">
+                        GROSS EARNING
+                      </td>
+                      <td className="border border-gray-300 p-1 text-right">
+                        ₹{payslipData.gross.toFixed(2)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <table className="w-full">
+                  <thead
+                    className="font-semibold p-1 border-r border-gray-300 text-white"
+                    style={{ backgroundColor: "#76bce4" }}
+                  >
+                    <tr>
+                      <th className="border border-gray-300 p-1 text-left">
+                        Deductions
+                      </th>
+                      <th className="border border-gray-300 p-1 text-right">
+                        Amount in Rs.
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["PROVIDENT FUND", payslipData.pf],
+                      ["PROFESSIONAL TAX", payslipData.proTax],
+                      ["INCOME TAX", payslipData.incomeTax],
+                    ].map(([label, val]) => (
+                      <tr key={label}>
+                        <td className="border border-gray-300 p-1">{label}</td>
+                        <td className="border border-gray-300 p-1 text-right">
+                          {val.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="font-bold">
+                      <td className="border border-gray-300 p-1">
+                        GROSS DEDUCTIONS
+                      </td>
+                      <td className="border border-gray-300 p-1 text-right">
+                        ₹{payslipData.deductions.toFixed(2)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Net Pay */}
+              <div className="border border-gray-400 border-t-0 text-right p-2 font-bold">
+                NET PAY ₹{payslipData.net.toFixed(2)}
+              </div>
+
+              {/* Footer */}
+              <div className="text-xs text-center mt-2 italic text-gray-600">
+                ** This is a computer generated payslip and does not require
+                signature and stamp.
+              </div>
+            </div>
           </div>
+        </>
+      )}
+      {payslipData && (
+        <div className="mt-4 flex gap-4">
+          <button
+            className="bg-green-600 hover:bg-green-700 transition duration-300 text-white px-4 py-2 rounded"
+            onClick={downloadPDF}
+          >
+            Download PDF
+          </button>
         </div>
       )}
     </div>
   );
 };
 
-export default PayslipForm;
+export default PayslipGenerator;

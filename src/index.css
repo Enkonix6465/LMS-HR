@@ -24,7 +24,9 @@ body {
 }
 
 /* Form styles */
-input, select, textarea {
+input,
+select,
+textarea {
   @apply border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white;
 }
 
