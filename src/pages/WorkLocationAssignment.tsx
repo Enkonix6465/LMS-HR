@@ -65,19 +65,34 @@ export default function AssignGeoFenceWithReverse() {
         setLng(lngVal);
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latVal}&lon=${lngVal}`
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latVal}&lon=${lngVal}&zoom=18&addressdetails=1`
           );
           const data = await res.json();
-          setAddress(data.display_name || `Lat: ${latVal}, Lng: ${lngVal}`);
-        } catch {
+          const fullAddress =
+            data.display_name ||
+            `${data.address.road || ""}, ${
+              data.address.city ||
+              data.address.town ||
+              data.address.village ||
+              ""
+            }, ${data.address.state || ""}, ${data.address.country || ""}`;
+          setAddress(fullAddress.trim() || `Lat: ${latVal}, Lng: ${lngVal}`);
+        } catch (err) {
+          console.error("Reverse geocoding failed:", err);
           setAddress(`Lat: ${latVal}, Lng: ${lngVal}`);
         } finally {
           setGpsLoading(false);
         }
       },
-      () => {
+      (error) => {
+        console.error("Geolocation error:", error);
         alert("Unable to retrieve your location.");
         setGpsLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
       }
     );
   };

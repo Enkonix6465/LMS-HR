@@ -144,7 +144,9 @@ const AdminAttendanceCalendar = () => {
 
   useEffect(() => {
     const filtered = events.filter((ev) =>
-      ev.extendedProps.name.toLowerCase().includes(search.toLowerCase())
+      (ev?.extendedProps?.name ?? "")
+        .toLowerCase()
+        .includes((search ?? "").toLowerCase())
     );
     setFilteredEvents(filtered);
   }, [search, events]);
@@ -216,7 +218,9 @@ const AdminAttendanceCalendar = () => {
           {
             title: "No Assignment",
             users: noAssignmentUsers.filter((u) =>
-              u.name.toLowerCase().includes(searchName.toLowerCase())
+              (u.name ?? "")
+                .toLowerCase()
+                .includes((searchName ?? "").toLowerCase())
             ),
             bg: "bg-yellow-500",
           },

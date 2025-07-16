@@ -19,6 +19,10 @@ import ChatMeetingPage from "./pages/ChatMeetingPage";
 import GeneratePayslip from "./pages/GeneratePayslip";
 import SalaryForm from "./pages/SalaryForm";
 import OfficeIPConfig from "./pages/OfficeIPConfig";
+import Chatbot from "./pages/Chatbot";
+import FaqAdmin from "./pages/FaqAdmin";
+import CheckDevice from "./pages/CheckDevice";
+import ShiftAssign from "./pages/ShiftAssign";
 function App() {
   const { user, loading } = useAuthStore();
   const { theme } = useThemeStore();
@@ -66,14 +70,15 @@ function App() {
           <Route path="GeneratePayslip" element={<GeneratePayslip />} />
           <Route path="SalaryForm" element={<SalaryForm />} />
           <Route path="OfficeIPConfig" element={<OfficeIPConfig />} />
+          <Route path="CheckDevice" element={<CheckDevice />} />
 
-          {/* Dashboard */}
-
-          {/* Work Location Assignment */}
           <Route
             path="WorkLocationAssignment"
             element={<WorkLocationAssignment />}
           />
+          <Route path="ShiftAssign" element={<ShiftAssign />} />
+          <Route path="Chatbot" element={<Chatbot />} />
+          <Route path="Faqadmin" element={<FaqAdmin />} />
 
           <Route path="settings" element={<Settings />} />
         </Route>

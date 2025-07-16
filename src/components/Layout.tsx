@@ -149,6 +149,7 @@ function Layout() {
               icon: Landmark,
               label: "WorkLocation",
             },
+            { path: "ShiftAssign", icon: Briefcase, label: "Shift Assign" },
             { path: "/SalaryForm", icon: Book, label: "Salary Form" },
             {
               path: "/GeneratePayslip",
@@ -169,6 +170,9 @@ function Layout() {
               label: "Chat & Meeting Room",
             },
             { path: "/OfficeIPConfig", icon: CheckSquare, label: "Office IPs" },
+            { path: "/CheckDevice", icon: CheckSquare, label: "Check Device" },
+            { path: "/Chatbot", icon: MessageSquareTextIcon, label: "Chatbot" },
+            { path: "/Faqadmin", icon: Book, label: "FAQ Admin" },
             { path: "/settings", icon: Settings, label: "Settings" },
           ].map(({ path, icon: Icon, label }) => (
             <Link
