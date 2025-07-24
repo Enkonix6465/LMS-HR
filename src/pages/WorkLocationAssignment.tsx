@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, doc, setDoc } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, query, where } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { eachDayOfInterval, format, parseISO } from "date-fns";
+import { eachDayOfInterval, format, parseISO, isWithinInterval } from "date-fns";
 
 interface Employee {
   id: string;
   name: string;
+  assignedUntil?: string;
 }
 
 export default function AssignGeoFenceWithReverse() {
@@ -23,14 +24,60 @@ export default function AssignGeoFenceWithReverse() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [assignLoading, setAssignLoading] = useState(false);
 
+  const [allocatedEmployees, setAllocatedEmployees] = useState<any[]>([]);
+
   useEffect(() => {
     const fetchEmployees = async () => {
+      // Get all employees
       const snapshot = await getDocs(collection(db, "employees"));
       const empList = snapshot.docs.map((doc) => ({
         id: doc.id,
         name: doc.data().name,
       }));
-      setEmployees(empList);
+      
+      // Get current date in YYYY-MM-DD format
+      const today = format(new Date(), "yyyy-MM-dd");
+      
+      const allocatedList: any[] = [];
+      
+      // Check each employee's current assignment status
+      const employeesWithAssignmentStatus = await Promise.all(
+        empList.map(async (emp) => {
+          // Get the latest assignment for this employee
+          const assignmentsRef = collection(db, "geoAssignments", emp.id, "dates");
+          const assignmentsSnap = await getDocs(assignmentsRef);
+          
+          // Find the latest assignment date that is >= today
+          const futureAssignments = assignmentsSnap.docs
+            .filter(doc => doc.id >= today)
+            .sort((a, b) => b.id.localeCompare(a.id));
+          
+          if (futureAssignments.length > 0) {
+            // Get the latest assignment end date
+            const latestAssignment = futureAssignments[0];
+            const assignmentData = latestAssignment.data();
+            
+            // Add to allocated employees list
+            allocatedList.push({
+              id: emp.id,
+              name: emp.name,
+              assignedUntil: latestAssignment.id,
+              location: assignmentData.address,
+              workFromHome: assignmentData.workFromHome
+            });
+            
+            return {
+              ...emp,
+              assignedUntil: latestAssignment.id
+            };
+          }
+          
+          return emp;
+        })
+      );
+      
+      setAllocatedEmployees(allocatedList);
+      setEmployees(employeesWithAssignmentStatus);
     };
     fetchEmployees();
   }, []);
@@ -151,9 +198,19 @@ export default function AssignGeoFenceWithReverse() {
   };
 
   const filteredEmployees = employees.filter(
-    (e) =>
-      e.name.toLowerCase().includes(search.toLowerCase()) ||
-      e.id.toLowerCase().includes(search.toLowerCase())
+    (e) => {
+      // Filter by search term
+      const matchesSearch = 
+        e.name.toLowerCase().includes(search.toLowerCase()) ||
+        e.id.toLowerCase().includes(search.toLowerCase());
+      
+      // Filter out employees with active assignments
+      const today = format(new Date(), "yyyy-MM-dd");
+      const hasActiveAssignment = e.assignedUntil && e.assignedUntil >= today;
+      
+      // Only show employees that match search and don't have active assignments
+      return matchesSearch && !hasActiveAssignment;
+    }
   );
 
   return (
@@ -176,19 +233,35 @@ export default function AssignGeoFenceWithReverse() {
           onClick={toggleSelectAll}
           className="mb-2 px-4 py-2 bg-gray-300 dark:bg-gray-700 rounded"
         >
-          {selected.length === employees.length ? "Deselect All" : "Select All"}
+          {selected.length === filteredEmployees.length ? "Deselect All" : "Select All"}
         </button>
+        
+        {/* Info message about filtered employees */}
+        {employees.length > 0 && filteredEmployees.length < employees.length && (
+          <div className="mb-2 p-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-sm">
+            <p>
+              <span className="font-bold">Note:</span> {employees.length - filteredEmployees.length} employee(s) with active work location assignments are not shown.
+            </p>
+          </div>
+        )}
+        
         <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto border p-2 rounded dark:border-gray-700">
-          {filteredEmployees.map((emp) => (
-            <label key={emp.id} className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={selected.includes(emp.id)}
-                onChange={() => toggleSelect(emp.id)}
-              />
-              {emp.name}
-            </label>
-          ))}
+          {filteredEmployees.length > 0 ? (
+            filteredEmployees.map((emp) => (
+              <label key={emp.id} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(emp.id)}
+                  onChange={() => toggleSelect(emp.id)}
+                />
+                {emp.name}
+              </label>
+            ))
+          ) : (
+            <p className="col-span-2 text-center py-4 text-gray-500 dark:text-gray-400">
+              No available employees found. Employees with active assignments are hidden.
+            </p>
+          )}
         </div>
       </div>
 
@@ -327,6 +400,43 @@ export default function AssignGeoFenceWithReverse() {
             "Assign Geo‑Fence"
           )}
         </button>
+      </div>
+
+      {/* Currently Allocated Employees */}
+      <div className="bg-white dark:bg-gray-800 rounded shadow p-4 mb-6">
+        <h3 className="font-semibold mb-2">Currently Allocated Employees</h3>
+        {allocatedEmployees.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full table-auto border text-center text-sm dark:text-gray-200">
+              <thead className="bg-gray-100 dark:bg-gray-700">
+                <tr>
+                  <th className="p-2 border">Employee</th>
+                  <th className="p-2 border">Allocated Until</th>
+                  <th className="p-2 border">Location</th>
+                  <th className="p-2 border">Work From Home</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allocatedEmployees.map((emp) => (
+                  <tr key={emp.id}>
+                    <td className="p-2 border">
+                      {emp.name} ({emp.id})
+                    </td>
+                    <td className="p-2 border">{emp.assignedUntil}</td>
+                    <td className="p-2 border">{emp.location}</td>
+                    <td className="p-2 border">
+                      {emp.workFromHome ? "Yes" : "No"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-center py-4 text-gray-500 dark:text-gray-400">
+            No employees are currently allocated to any work location.
+          </p>
+        )}
       </div>
 
       {/* Preview Assignments */}

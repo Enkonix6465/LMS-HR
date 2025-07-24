@@ -3,6 +3,7 @@ import { useAuthStore } from "../store/authStore";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { Lock, Mail } from "lucide-react";
+import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -10,6 +11,9 @@ function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const { signIn } = useAuthStore();
   const navigate = useNavigate();
+  const [showForgot, setShowForgot] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetMsg, setResetMsg] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +33,17 @@ function Login() {
       toast.error("Invalid login credentials");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetMsg("");
+    try {
+      await sendPasswordResetEmail(getAuth(), resetEmail);
+      setResetMsg("Password reset email sent!");
+    } catch (err: any) {
+      setResetMsg(err.message);
     }
   };
 
@@ -120,6 +135,29 @@ function Login() {
               </button>
             </div>
           </form>
+          <div className="flex justify-end mt-2">
+            <button
+              type="button"
+              className="text-blue-600 hover:underline text-sm"
+              onClick={() => setShowForgot((v) => !v)}
+            >
+              Forgot Password?
+            </button>
+          </div>
+          {showForgot && (
+            <form onSubmit={handleForgot} className="mt-2 space-y-2">
+              <input
+                type="email"
+                placeholder="Enter your email"
+                className="w-full p-2 border rounded"
+                value={resetEmail}
+                onChange={e => setResetEmail(e.target.value)}
+                required
+              />
+              <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded">Send Reset Email</button>
+              {resetMsg && <div className="mt-2 text-xs text-green-600">{resetMsg}</div>}
+            </form>
+          )}
         </div>
       </div>
     </div>

@@ -70,97 +70,161 @@ interface MonthlySummary {
   absentDays: number;
 }
 
+// --- AI Attendance Panel ---
+function AIAttendancePanel({ workLogs, summaries, employee }: { workLogs: WorkLog[]; summaries: MonthlySummary[]; employee: Employee }) {
+  // Anomaly detection: days with < 4h or missing logouts
+  const anomalies = React.useMemo(() => {
+    return workLogs.filter(log => {
+      const [h = 0] = log.duration?.split('h').map((v: any) => parseInt(v)) || [0];
+      return h < 4 || !log.logout;
+    });
+  }, [workLogs]);
+
+  // Absenteeism risk: 3+ absents in last 30 days
+  const absentCount = React.useMemo(() => {
+    const now = new Date();
+    const last30 = new Date(now);
+    last30.setDate(now.getDate() - 30);
+    return workLogs.filter(log => {
+      const d = new Date(log.date);
+      return d >= last30 && (!log.login || !log.logout);
+    }).length;
+  }, [workLogs]);
+
+  // Personalized tip
+  let tip = "Great job! Keep up the good attendance.";
+  if (absentCount >= 3) tip = "You have several absences in the last month. Try to maintain regular attendance.";
+  else if (anomalies.length > 0) tip = "Some days have short hours or missing logouts. Please ensure to complete your work hours and logout properly.";
+
+  return (
+    <div className="mb-6 bg-gradient-to-br from-yellow-50 via-blue-50 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 rounded-xl shadow p-4">
+      <h3 className="font-bold text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-2"><span>🤖</span>AI Attendance Insights</h3>
+      <div className="mb-2 text-sm text-gray-700 dark:text-gray-200">{tip}</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <h4 className="font-semibold text-red-700 dark:text-red-300 mb-1 text-xs flex items-center gap-1">⚠️ Anomalies</h4>
+          {anomalies.length === 0 ? <div className="text-xs text-gray-400">None</div> : (
+            <ul className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+              {anomalies.map((log, i) => <li key={i}>{log.date}: {log.duration} {(!log.logout ? '(No logout)' : '')}</li>)}
+            </ul>
+          )}
+        </div>
+        <div>
+          <h4 className="font-semibold text-yellow-700 dark:text-yellow-300 mb-1 text-xs flex items-center gap-1">🚫 Absenteeism Risk</h4>
+          <div className="text-xs text-gray-700 dark:text-gray-200">{absentCount} absences in last 30 days</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SearchAttendanceDashboard() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selected, setSelected] = useState<Employee | null>(null);
   const [selectedDate, setSelectedDate] = useState("");
-
   const [searchTerm, setSearchTerm] = useState("");
   const [summaries, setSummaries] = useState<MonthlySummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const employeeSnap = await getDocs(collection(db, "employees"));
-      const employeeData = employeeSnap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      setLoading(true);
+      setError(null);
+      try {
+        const employeeSnap = await getDocs(collection(db, "employees"));
+        const employeeData: Employee[] = employeeSnap.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || "Unknown",
+            email: data.email || "",
+            department: data.department || "",
+            title: data.title || "",
+            phone: data.phone || "",
+            workLogs: [],
+          };
+        });
 
-      const attendanceSnap = await getDocs(collection(db, "attendance"));
+        const attendanceSnap = await getDocs(collection(db, "attendance"));
 
-      const logs: Employee[] = [];
-
-      for (const emp of employeeData) {
-        const workLogs: WorkLog[] = [];
-
-        attendanceSnap.docs.forEach((att) => {
-          const data = att.data() as AttendanceData;
-
-          if (data.userId === emp.id) {
-            data.sessions.forEach((s, idx) => {
-              workLogs.push({
-                date: data.date,
-                login: s.login,
-                logout: s.logout,
-                duration:
-                  idx === data.sessions.length - 1 ? data.totalHours : "",
-                location: data.location,
-                loginAddress: s.loginLocation?.address ?? "-",
-                logoutAddress: s.logoutLocation?.address ?? "-",
+        const logs: Employee[] = [];
+        for (const emp of employeeData) {
+          const workLogs: WorkLog[] = [];
+          attendanceSnap.docs.forEach((att) => {
+            const data = att.data() as AttendanceData;
+            if (data.userId === emp.id) {
+              data.sessions.forEach((s, idx) => {
+                workLogs.push({
+                  date: data.date,
+                  login: s.login,
+                  logout: s.logout,
+                  duration:
+                    idx === data.sessions.length - 1 ? data.totalHours : "",
+                  location: data.location,
+                  loginAddress: s.loginLocation?.address ?? "-",
+                  logoutAddress: s.logoutLocation?.address ?? "-",
+                });
               });
-            });
-          }
-        });
-
-        logs.push({
-          id: emp.id,
-          name: emp.name,
-          email: emp.email,
-          department: emp.department,
-          title: emp.title,
-          phone: emp.phone,
-          workLogs,
-        });
+            }
+          });
+          logs.push({
+            id: emp.id,
+            name: emp.name,
+            email: emp.email,
+            department: emp.department,
+            title: emp.title,
+            phone: emp.phone,
+            workLogs,
+          });
+        }
+        setEmployees(logs);
+        setLoading(false);
+      } catch (err: any) {
+        setError("Failed to fetch attendance data. " + (err?.message || ""));
+        setLoading(false);
       }
-
-      setEmployees(logs);
     };
-
     fetchData();
   }, []);
 
   useEffect(() => {
     const fetchSummaries = async () => {
-      const summarySnap = await getDocs(collection(db, "attendanceSummary"));
-      const data: MonthlySummary[] = [];
-
-      summarySnap.forEach((doc) => {
-        const s = doc.data();
-
-        const countedLength = s.countedDates?.length || 0;
-
-        data.push({
-          userId: s.userId,
-          name: s.name,
-          email: s.email,
-          department: s.department,
-          month: s.month,
-          presentDays: s.presentDays,
-          halfDays: s.halfDays,
-          leavesTaken: s.leavesTaken,
-          extraLeaves: s.extraLeaves,
-          totalWorkingDays: s.totalWorkingDays,
-          workingDaysTillToday: countedLength,
-          totalmonthHours: s.totalmonthHours,
-          absentDays:
-            countedLength - (s.presentDays + s.halfDays + s.leavesTaken),
-          carryForwardLeaves: s.carryForwardLeaves || 0,
+      setSummaryLoading(true);
+      setSummaryError(null);
+      try {
+        const summarySnap = await getDocs(collection(db, "attendanceSummary"));
+        const data: MonthlySummary[] = [];
+        summarySnap.forEach((doc) => {
+          const s = doc.data();
+          const countedLength = s.countedDates?.length || 0;
+          data.push({
+            userId: s.userId,
+            name: s.name,
+            email: s.email,
+            department: s.department,
+            month: s.month,
+            presentDays: s.presentDays,
+            halfDays: s.halfDays,
+            leavesTaken: s.leavesTaken,
+            extraLeaves: s.extraLeaves,
+            totalWorkingDays: s.totalWorkingDays,
+            workingDaysTillToday: countedLength,
+            totalmonthHours: s.totalmonthHours,
+            absentDays:
+              countedLength - (s.presentDays + s.halfDays + s.leavesTaken),
+            carryForwardLeaves: s.carryForwardLeaves || 0,
+          });
         });
-      });
-
-      setSummaries(data);
+        setSummaries(data);
+        setSummaryLoading(false);
+      } catch (err: any) {
+        setSummaryError("Failed to fetch summaries. " + (err?.message || ""));
+        setSummaryLoading(false);
+      }
     };
-
     fetchSummaries();
   }, []);
 
@@ -190,6 +254,22 @@ export default function SearchAttendanceDashboard() {
       e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Responsive: show loading/error/empty states
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-blue-600 animate-pulse">
+        Loading attendance data...
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-red-600">
+        {error}
+      </div>
+    );
+  }
 
   const exportCSV = () => {
     if (!selected) return;
@@ -290,6 +370,7 @@ export default function SearchAttendanceDashboard() {
               className="w-full border border-gray-300 dark:border-gray-700 px-4 py-2 rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 dark:bg-gray-800 dark:text-white transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              aria-label="Search employees"
             />
           </div>
 
@@ -304,24 +385,33 @@ export default function SearchAttendanceDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((emp, idx) => (
-                  <tr
-                    key={idx}
-                    className="hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-150"
-                  >
-                    <td className="px-4 py-2 border">{emp.name}</td>
-                    <td className="px-4 py-2 border">{emp.email}</td>
-                    <td className="px-4 py-2 border">{emp.department}</td>
-                    <td className="px-4 py-2 border">
-                      <button
-                        className="text-white bg-blue-600 hover:bg-blue-700 transition px-3 py-1 rounded shadow-sm text-xs sm:text-sm"
-                        onClick={() => setSelected(emp)}
-                      >
-                        View Attendance
-                      </button>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-center py-4 text-gray-500">
+                      No employees found.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filtered.map((emp, idx) => (
+                    <tr
+                      key={idx}
+                      className="hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-150"
+                    >
+                      <td className="px-4 py-2 border">{emp.name}</td>
+                      <td className="px-4 py-2 border">{emp.email}</td>
+                      <td className="px-4 py-2 border">{emp.department}</td>
+                      <td className="px-4 py-2 border">
+                        <button
+                          className="text-white bg-blue-600 hover:bg-blue-700 transition px-3 py-1 rounded shadow-sm text-xs sm:text-sm"
+                          onClick={() => setSelected(emp)}
+                          aria-label={`View attendance for ${emp.name}`}
+                        >
+                          View Attendance
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -331,6 +421,7 @@ export default function SearchAttendanceDashboard() {
           <button
             onClick={() => setSelected(null)}
             className="mb-4 bg-gray-100 dark:bg-gray-800 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 px-4 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition duration-200"
+            aria-label="Back to Employee List"
           >
             ← Back to Employee List
           </button>
@@ -342,6 +433,8 @@ export default function SearchAttendanceDashboard() {
             <p className="text-center text-gray-600 dark:text-gray-300 mb-4">
               {selected?.name}
             </p>
+            {/* AI Attendance Panel */}
+            <AIAttendancePanel workLogs={selected.workLogs} summaries={summaries} employee={selected} />
 
             <div className="flex items-center justify-center flex-wrap gap-3 mb-6">
               <label className="text-gray-700 dark:text-gray-200 font-medium">
@@ -353,11 +446,13 @@ export default function SearchAttendanceDashboard() {
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 max={new Date().toISOString().split("T")[0]}
+                aria-label="Select date"
               />
               {selectedDate && (
                 <button
                   className="text-sm text-red-500 underline"
                   onClick={() => setSelectedDate("")}
+                  aria-label="Clear date filter"
                 >
                   Clear
                 </button>
@@ -381,59 +476,67 @@ export default function SearchAttendanceDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {attendanceList.map((att, index) => {
-                    const [h = 0] = att.totalHours
-                      ?.split("h")
-                      .map((v: any) => parseInt(v)) || [0];
-                    const isUnderworked = h < 9;
+                  {attendanceList.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="text-center py-4 text-gray-500">
+                        No attendance records found for this date.
+                      </td>
+                    </tr>
+                  ) : (
+                    attendanceList.map((att, index) => {
+                      const [h = 0] = att.totalHours
+                        ?.split("h")
+                        .map((v: any) => parseInt(v)) || [0];
+                      const isUnderworked = h < 9;
 
-                    return (
-                      <tr
-                        key={index}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
-                      >
-                        <td className="border px-4 py-2">{index + 1}</td>
-                        <td className="border px-4 py-2">{att.date}</td>
-                        <td
-                          className={`border px-4 py-2 font-semibold ${
-                            isUnderworked ? "text-red-600" : "text-green-600"
-                          }`}
+                      return (
+                        <tr
+                          key={index}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
                         >
-                          {att.totalHours}
-                        </td>
-                        <td className="border px-4 py-2">
-                          <ul className="space-y-2">
-                            {att.sessions.map((s, i) => (
-                              <li
-                                key={i}
-                                className="pb-2 border-b border-dashed last:border-b-0 text-sm"
-                              >
-                                <div>
-                                  <span className="text-green-600 font-semibold">
-                                    🟢 Login:
-                                  </span>{" "}
-                                  {s.login || "—"}
-                                </div>
-                                <div className="ml-4 text-xs text-gray-600 dark:text-gray-300">
-                                  📍 {s.loginLocation.address}
-                                </div>
+                          <td className="border px-4 py-2">{index + 1}</td>
+                          <td className="border px-4 py-2">{att.date}</td>
+                          <td
+                            className={`border px-4 py-2 font-semibold ${
+                              isUnderworked ? "text-red-600" : "text-green-600"
+                            }`}
+                          >
+                            {att.totalHours}
+                          </td>
+                          <td className="border px-4 py-2">
+                            <ul className="space-y-2">
+                              {att.sessions.map((s, i) => (
+                                <li
+                                  key={i}
+                                  className="pb-2 border-b border-dashed last:border-b-0 text-sm"
+                                >
+                                  <div>
+                                    <span className="text-green-600 font-semibold">
+                                      🟢 Login:
+                                    </span>{" "}
+                                    {s.login || "—"}
+                                  </div>
+                                  <div className="ml-4 text-xs text-gray-600 dark:text-gray-300">
+                                    📍 {s.loginLocation.address}
+                                  </div>
 
-                                <div className="mt-1">
-                                  <span className="text-red-600 font-semibold">
-                                    🔴 Logout:
-                                  </span>{" "}
-                                  {s.logout || "⏳"}
-                                </div>
-                                <div className="ml-4 text-xs text-gray-600 dark:text-gray-300">
-                                  📍 {s.logoutLocation.address}
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                                  <div className="mt-1">
+                                    <span className="text-red-600 font-semibold">
+                                      🔴 Logout:
+                                    </span>{" "}
+                                    {s.logout || "⏳"}
+                                  </div>
+                                  <div className="ml-4 text-xs text-gray-600 dark:text-gray-300">
+                                    📍 {s.logoutLocation.address}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -445,95 +548,109 @@ export default function SearchAttendanceDashboard() {
               📋 Monthly Attendance Summary
             </h2>
 
-            <div className="overflow-x-auto">
-              <table className="w-full table-auto border text-sm text-center shadow bg-white dark:bg-gray-800 rounded-md min-w-[900px] animate-slide-up">
-                <thead className="bg-green-100 dark:bg-green-900 text-black dark:text-gray-200 font-bold">
-                  <tr>
-                    <th className="border px-3 py-2">Month</th>
-                    <th className="border px-3 py-2">Working Days</th>
-                    <th className="border px-3 py-2 text-blue-600 dark:text-blue-300">
-                      Working Days (Till Today)
-                    </th>
-                    <th className="border px-3 py-2">Present</th>
-                    <th className="border px-3 py-2">Half</th>
-                    <th className="border px-3 py-2">Absent</th>
-                    <th className="border px-3 py-2">Leaves Taken</th>
-                    <th className="border px-3 py-2 text-red-600">
-                      Extra Leaves
-                    </th>
-                    <th className="border px-3 py-2 text-green-600">
-                      Carry Forward
-                    </th>
-                    <th className="border px-3 py-2">Total Hours</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getEmployeeSummaries(selected.id).map((row, idx) => {
-                    const extraWorkLog = summaries.find(
-                      (s) => s.userId === row.userId && s.month === row.month
-                    ) as any;
+            {summaryLoading ? (
+              <div className="text-center text-blue-600 animate-pulse">Loading summary...</div>
+            ) : summaryError ? (
+              <div className="text-center text-red-600">{summaryError}</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full table-auto border text-sm text-center shadow bg-white dark:bg-gray-800 rounded-md min-w-[900px] animate-slide-up">
+                  <thead className="bg-green-100 dark:bg-green-900 text-black dark:text-gray-200 font-bold">
+                    <tr>
+                      <th className="border px-3 py-2">Month</th>
+                      <th className="border px-3 py-2">Working Days</th>
+                      <th className="border px-3 py-2 text-blue-600 dark:text-blue-300">
+                        Working Days (Till Today)
+                      </th>
+                      <th className="border px-3 py-2">Present</th>
+                      <th className="border px-3 py-2">Half</th>
+                      <th className="border px-3 py-2">Absent</th>
+                      <th className="border px-3 py-2">Leaves Taken</th>
+                      <th className="border px-3 py-2 text-red-600">
+                        Extra Leaves
+                      </th>
+                      <th className="border px-3 py-2 text-green-600">
+                        Carry Forward
+                      </th>
+                      <th className="border px-3 py-2">Total Hours</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getEmployeeSummaries(selected.id).length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="text-center py-4 text-gray-500">
+                          No summary data found for this employee.
+                        </td>
+                      </tr>
+                    ) : (
+                      getEmployeeSummaries(selected.id).map((row, idx) => {
+                        const extraWorkLog = summaries.find(
+                          (s) => s.userId === row.userId && s.month === row.month
+                        ) as any;
 
-                    const extraHours: Record<string, string> =
-                      extraWorkLog?.extraWorkLog || {};
+                        const extraHours: Record<string, string> =
+                          extraWorkLog?.extraWorkLog || {};
 
-                    return (
-                      <React.Fragment key={idx}>
-                        <tr className="bg-white dark:bg-gray-900 font-semibold">
-                          <td className="border px-3 py-2">{row.month}</td>
-                          <td className="border px-3 py-2">
-                            {row.totalWorkingDays}
-                          </td>
-                          <td className="border px-3 py-2">
-                            {row.workingDaysTillToday}
-                          </td>
-                          <td className="border px-3 py-2">
-                            {row.presentDays}
-                          </td>
-                          <td className="border px-3 py-2">{row.halfDays}</td>
-                          <td className="border px-3 py-2">{row.absentDays}</td>
-                          <td className="border px-3 py-2">
-                            {row.leavesTaken}
-                          </td>
-                          <td className="border px-3 py-2 text-red-600">
-                            {row.extraLeaves}
-                          </td>
-                          <td className="border px-3 py-2 text-green-600">
-                            {row.carryForwardLeaves}
-                          </td>
-                          <td className="border px-3 py-2">
-                            {row.totalmonthHours}
-                          </td>
-                        </tr>
-                        {Object.entries(extraHours).length > 0 && (
-                          <tr className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-700 dark:text-gray-300">
-                            <td
-                              colSpan={10}
-                              className="border px-3 py-2 text-left"
-                            >
-                              <span className="font-semibold text-green-700 dark:text-green-300">
-                                🕒 Extra Hours Worked:
-                              </span>
-                              <ul className="list-disc list-inside mt-1 space-y-1">
-                                {Object.entries(extraHours).map(
-                                  ([date, duration]) => (
-                                    <li key={date}>
-                                      {date}:{" "}
-                                      <span className="font-medium">
-                                        {duration}
-                                      </span>
-                                    </li>
-                                  )
-                                )}
-                              </ul>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        return (
+                          <React.Fragment key={idx}>
+                            <tr className="bg-white dark:bg-gray-900 font-semibold">
+                              <td className="border px-3 py-2">{row.month}</td>
+                              <td className="border px-3 py-2">
+                                {row.totalWorkingDays}
+                              </td>
+                              <td className="border px-3 py-2">
+                                {row.workingDaysTillToday}
+                              </td>
+                              <td className="border px-3 py-2">
+                                {row.presentDays}
+                              </td>
+                              <td className="border px-3 py-2">{row.halfDays}</td>
+                              <td className="border px-3 py-2">{row.absentDays}</td>
+                              <td className="border px-3 py-2">
+                                {row.leavesTaken}
+                              </td>
+                              <td className="border px-3 py-2 text-red-600">
+                                {row.extraLeaves}
+                              </td>
+                              <td className="border px-3 py-2 text-green-600">
+                                {row.carryForwardLeaves}
+                              </td>
+                              <td className="border px-3 py-2">
+                                {row.totalmonthHours}
+                              </td>
+                            </tr>
+                            {Object.entries(extraHours).length > 0 && (
+                              <tr className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-700 dark:text-gray-300">
+                                <td
+                                  colSpan={10}
+                                  className="border px-3 py-2 text-left"
+                                >
+                                  <span className="font-semibold text-green-700 dark:text-green-300">
+                                    🕒 Extra Hours Worked:
+                                  </span>
+                                  <ul className="list-disc list-inside mt-1 space-y-1">
+                                    {Object.entries(extraHours).map(
+                                      ([date, duration]) => (
+                                        <li key={date}>
+                                          {date}: {" "}
+                                          <span className="font-medium">
+                                            {duration}
+                                          </span>
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </>
       )}

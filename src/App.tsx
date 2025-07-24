@@ -23,6 +23,11 @@ import Chatbot from "./pages/Chatbot";
 import FaqAdmin from "./pages/FaqAdmin";
 import CheckDevice from "./pages/CheckDevice";
 import ShiftAssign from "./pages/ShiftAssign";
+import ComplaintManagement from "./pages/ComplaintManagement";
+import OrgChart from "./pages/OrgChart";
+import VotingPage from "./pages/Voting";
+
+
 function App() {
   const { user, loading } = useAuthStore();
   const { theme } = useThemeStore();
@@ -57,6 +62,8 @@ function App() {
           path="/login"
           element={!user ? <Login /> : <Navigate to="/" />}
         />
+        <Route path="/org-chart" element={<OrgChart />} />
+        <Route path="/voting" element={<VotingPage />} />
         <Route path="/" element={user ? <Layout /> : <Navigate to="/login" />}>
           <Route index element={<Dashboard />} />
           <Route path="users" element={<UserManagement />} />
@@ -79,6 +86,8 @@ function App() {
           <Route path="ShiftAssign" element={<ShiftAssign />} />
           <Route path="Chatbot" element={<Chatbot />} />
           <Route path="Faqadmin" element={<FaqAdmin />} />
+          <Route path="complaint-management" element={<ComplaintManagement />} />
+
 
           <Route path="settings" element={<Settings />} />
         </Route>

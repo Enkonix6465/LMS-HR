@@ -27,6 +27,76 @@ interface Employee {
   status: string;
 }
 
+// --- AI Employee Panel ---
+function AIEmployeePanel({ employees }: { employees: Employee[] }) {
+  // Attrition risk: employees with status not 'Active' or with short tenure
+  const attritionRisks = React.useMemo(() => {
+    const now = new Date();
+    return employees.filter(emp => {
+      if (emp.status !== 'Active') return true;
+      if (emp.joiningDate) {
+        const join = new Date(emp.joiningDate);
+        const months = (now.getFullYear() - join.getFullYear()) * 12 + (now.getMonth() - join.getMonth());
+        return months < 3; // New joiners at risk
+      }
+      return false;
+    });
+  }, [employees]);
+
+  // Skill gap: employees without a title or department
+  const skillGaps = React.useMemo(() => employees.filter(emp => !emp.title || !emp.department), [employees]);
+
+  // Onboarding: new joiners in last 30 days
+  const onboarding = React.useMemo(() => {
+    const now = new Date();
+    return employees.filter(emp => {
+      if (!emp.joiningDate) return false;
+      const join = new Date(emp.joiningDate);
+      const diff = (now.getTime() - join.getTime()) / (1000 * 60 * 60 * 24);
+      return diff < 30;
+    });
+  }, [employees]);
+
+  const [expanded, setExpanded] = React.useState(false);
+
+  return (
+    <div className="mb-6 bg-gradient-to-br from-blue-50 via-yellow-50 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 rounded-xl shadow p-4">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2">🤖 AI Employee Insights</h3>
+        <button onClick={() => setExpanded(e => !e)} className="text-xs text-blue-600 dark:text-blue-300 underline">{expanded ? 'Hide' : 'Show'}</button>
+      </div>
+      {expanded && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <h4 className="font-semibold text-red-700 dark:text-red-300 mb-1 text-xs flex items-center gap-1">⚠️ Attrition Risk</h4>
+            {attritionRisks.length === 0 ? <div className="text-xs text-gray-400">None</div> : (
+              <ul className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                {attritionRisks.map((emp, i) => <li key={i}>{emp.name} ({emp.status})</li>)}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h4 className="font-semibold text-yellow-700 dark:text-yellow-300 mb-1 text-xs flex items-center gap-1">🧑‍💻 Skill Gaps</h4>
+            {skillGaps.length === 0 ? <div className="text-xs text-gray-400">None</div> : (
+              <ul className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                {skillGaps.map((emp, i) => <li key={i}>{emp.name} (Missing: {!emp.title ? 'Title' : ''}{!emp.title && !emp.department ? ', ' : ''}{!emp.department ? 'Department' : ''})</li>)}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h4 className="font-semibold text-green-700 dark:text-green-300 mb-1 text-xs flex items-center gap-1">🌱 Onboarding</h4>
+            {onboarding.length === 0 ? <div className="text-xs text-gray-400">None</div> : (
+              <ul className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                {onboarding.map((emp, i) => <li key={i}>{emp.name} (Joined: {emp.joiningDate})</li>)}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EmployeeManagement() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [form, setForm] = useState<Employee>({
@@ -189,71 +259,166 @@ export default function EmployeeManagement() {
         </div>
       )}
 
+      <AIEmployeePanel employees={employees} />
+
       <div className="bg-white dark:bg-gray-800 shadow-lg p-4 rounded mb-8 animate-slide-up">
         <h3 className="font-semibold mb-4 text-lg">➕ Add / Edit Employee</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            ["name", "Full Name"],
-            ["email", "Email"],
-            ["phone", "Phone"],
-            ["photo", "Photo URL"],
-            ["title", "Job Title"],
-            ["department", "Department"],
-            ["manager", "Manager"],
-            ["location", "Location"],
-          ].map(([name, placeholder]) => (
-            <input
-              key={name}
-              name={name}
-              value={form[name as keyof Employee]}
-              onChange={handleChange}
-              placeholder={placeholder}
-              className="border p-2 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
-          ))}
-          <select
-            name="type"
-            value={form.type}
-            onChange={handleChange}
-            className="border p-2 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          >
-            <option>Full-time</option>
-            <option>Part-time</option>
-            <option>Intern</option>
-            <option>Contract</option>
-          </select>
-          <select
-            name="status"
-            value={form.status}
-            onChange={handleChange}
-            className="border p-2 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          >
-            <option>Active</option>
-            <option>Inactive</option>
-            <option>Terminated</option>
-          </select>
-          <input
-            type="date"
-            name="dob"
-            value={form.dob}
-            onChange={handleChange}
-            className="border p-2 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          />
-          <input
-            type="date"
-            name="joiningDate"
-            value={form.joiningDate}
-            onChange={handleChange}
-            className="border p-2 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          />
-        </div>
-        <button
-          onClick={handleAddOrUpdate}
-          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded transition duration-200"
+        <form
+          onSubmit={e => { e.preventDefault(); handleAddOrUpdate(); }}
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4"
         >
-          {editIndex !== null ? "Update" : "Add"} Employee
-        </button>
-
+          <div className="col-span-1 sm:col-span-2 md:col-span-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="name">Full Name<span className="text-red-500">*</span></label>
+              <input
+                id="name"
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                placeholder="Full Name"
+                className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="email">Email<span className="text-red-500">*</span></label>
+              <input
+                id="email"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="Email"
+                className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                required
+                type="email"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="phone">Phone</label>
+              <input
+                id="phone"
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                placeholder="Phone"
+                className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="photo">Photo URL</label>
+              <input
+                id="photo"
+                name="photo"
+                value={form.photo}
+                onChange={handleChange}
+                placeholder="Photo URL"
+                className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="dob">Date of Birth<span className="text-red-500">*</span></label>
+              <input
+                id="dob"
+                type="date"
+                name="dob"
+                value={form.dob}
+                onChange={handleChange}
+                className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="joiningDate">Joining Date</label>
+              <input
+                id="joiningDate"
+                type="date"
+                name="joiningDate"
+                value={form.joiningDate}
+                onChange={handleChange}
+                className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="title">Job Title</label>
+              <input
+                id="title"
+                name="title"
+                value={form.title}
+                onChange={handleChange}
+                placeholder="Job Title"
+                className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="department">Department</label>
+              <input
+                id="department"
+                name="department"
+                value={form.department}
+                onChange={handleChange}
+                placeholder="Department"
+                className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="manager">Manager</label>
+              <input
+                id="manager"
+                name="manager"
+                value={form.manager}
+                onChange={handleChange}
+                placeholder="Manager"
+                className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="location">Location</label>
+              <input
+                id="location"
+                name="location"
+                value={form.location}
+                onChange={handleChange}
+                placeholder="Location"
+                className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="type">Employment Type</label>
+              <select
+                id="type"
+                name="type"
+                value={form.type}
+                onChange={handleChange}
+                className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              >
+                <option>Full-time</option>
+                <option>Part-time</option>
+                <option>Intern</option>
+                <option>Contract</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="status">Status</label>
+              <select
+                id="status"
+                name="status"
+                value={form.status}
+                onChange={handleChange}
+                className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              >
+                <option>Active</option>
+                <option>Inactive</option>
+                <option>Terminated</option>
+              </select>
+            </div>
+          </div>
+          <button
+            type="submit"
+            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded transition duration-200 col-span-1 sm:col-span-2 md:col-span-4"
+          >
+            {editIndex !== null ? "Update" : "Add"} Employee
+          </button>
+        </form>
         <div className="mt-6">
           <label className="block font-medium mb-1">📥 Bulk Upload</label>
           <input
@@ -276,6 +441,7 @@ export default function EmployeeManagement() {
                 <th className="border px-2 py-2">Email</th>
                 <th className="border px-2 py-2">Phone</th>
                 <th className="border px-2 py-2">Department</th>
+                <th className="border px-2 py-2">Date of Birth</th>
                 <th className="border px-2 py-2">Status</th>
                 <th className="border px-2 py-2">Actions</th>
               </tr>
@@ -301,6 +467,7 @@ export default function EmployeeManagement() {
                   <td className="border px-2 py-2">{emp.email}</td>
                   <td className="border px-2 py-2">{emp.phone}</td>
                   <td className="border px-2 py-2">{emp.department}</td>
+                  <td className="border px-2 py-2">{emp.dob}</td>
                   <td className="border px-2 py-2">{emp.status}</td>
                   <td className="border px-2 py-2 space-x-2">
                     <button

@@ -1,9 +1,33 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../lib/firebase";
 import { collection, doc, getDocs, setDoc } from "firebase/firestore";
+import { format } from "date-fns";
+
+interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  shiftEndDate?: string;
+}
+
+interface ShiftAssignment {
+  startTime: string;
+  endTime: string;
+  assignedBy: string;
+  createdAt: string;
+}
+
+interface AllocatedEmployee {
+  id: string;
+  name: string;
+  email: string;
+  shiftEndDate: string;
+  startTime: string;
+  endTime: string;
+}
 
 export default function ShiftAssignmentPage() {
-  const [employees, setEmployees] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -12,15 +36,64 @@ export default function ShiftAssignmentPage() {
   const [extraHours, setExtraHours] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [shiftHistory, setShiftHistory] = useState<any[]>([]);
+  const [shiftHistory, setShiftHistory] = useState<ShiftAssignment[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [allocatedEmployees, setAllocatedEmployees] = useState<AllocatedEmployee[]>([]);
 
   useEffect(() => {
     const fetchEmployees = async () => {
       setLoading(true);
+
+      // Get all employees
       const snap = await getDocs(collection(db, "employees"));
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setEmployees(data);
+      const employeeData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      // Get current date in YYYY-MM-DD format
+      const today = format(new Date(), "yyyy-MM-dd");
+
+      const allocatedList: AllocatedEmployee[] = [];
+
+      // Check each employee's current shift status
+      const employeesWithShiftStatus = await Promise.all(
+        employeeData.map(async (emp) => {
+          // Get the shifts for this employee
+          const shiftsRef = collection(db, "shiftAssignments", emp.id, "dates");
+          const shiftsSnap = await getDocs(shiftsRef);
+
+          // Find the latest shift date that is >= today
+          const futureShifts = shiftsSnap.docs
+            .filter((doc) => doc.id >= today)
+            .sort((a, b) => b.id.localeCompare(a.id));
+
+          if (futureShifts.length > 0) {
+            // Get the latest shift end date
+            const latestShift = futureShifts[0];
+            const shiftData = latestShift.data();
+
+            // Add to allocated employees list
+            allocatedList.push({
+              id: emp.id,
+              name: emp.name || "",
+              email: emp.email || "",
+              shiftEndDate: latestShift.id,
+              startTime: shiftData.startTime,
+              endTime: shiftData.endTime,
+            });
+
+            return {
+              ...emp,
+              shiftEndDate: latestShift.id,
+              name: emp.name || "",
+              email: emp.email || "",
+            };
+          }
+
+          return emp;
+        })
+      );
+
+      setAllocatedEmployees(allocatedList);
+      setEmployees(employeesWithShiftStatus);
       setLoading(false);
     };
     fetchEmployees();
@@ -85,11 +158,19 @@ export default function ShiftAssignmentPage() {
     return `${hour}:${minute} ${ampm}`;
   };
 
-  const filteredEmployees = employees.filter(
-    (emp) =>
+  const filteredEmployees = employees.filter((emp) => {
+    // Filter by search term
+    const matchesSearch =
       emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      emp.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Filter out employees with active shifts
+    const today = format(new Date(), "yyyy-MM-dd");
+    const hasActiveShift = emp.shiftEndDate && emp.shiftEndDate >= today;
+
+    // Only show employees that match search and don't have active shifts
+    return matchesSearch && !hasActiveShift;
+  });
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -139,17 +220,33 @@ export default function ShiftAssignmentPage() {
               />
               Select All
             </label>
-            {filteredEmployees.map((emp) => (
-              <label key={emp.id} className="flex items-center mb-1">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.includes(emp.id)}
-                  onChange={() => handleSelectOne(emp.id)}
-                  className="mr-2"
-                />
-                {emp.name} ({emp.email})
-              </label>
-            ))}
+            
+            {/* Info message about filtered employees */}
+            {employees.length > 0 && filteredEmployees.length < employees.length && (
+              <div className="mb-2 p-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-sm">
+                <p>
+                  <span className="font-bold">Note:</span> {employees.length - filteredEmployees.length} employee(s) with active shift assignments are not shown.
+                </p>
+              </div>
+            )}
+            
+            {filteredEmployees.length > 0 ? (
+              filteredEmployees.map((emp) => (
+                <label key={emp.id} className="flex items-center mb-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(emp.id)}
+                    onChange={() => handleSelectOne(emp.id)}
+                    className="mr-2"
+                  />
+                  {emp.name} ({emp.email})
+                </label>
+              ))
+            ) : (
+              <p className="text-center py-4 text-gray-500 dark:text-gray-400">
+                No available employees found. Employees with active shift assignments are hidden.
+              </p>
+            )}
           </div>
 
           <div className="grid md:grid-cols-3 gap-4">
@@ -228,6 +325,43 @@ export default function ShiftAssignmentPage() {
               "Save Shift"
             )}
           </button>
+
+          {/* Currently Allocated Employees */}
+          <div className="mt-10">
+            <h3 className="text-xl font-bold mb-2">
+              👥 Currently Allocated Employees
+            </h3>
+            {allocatedEmployees.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full table-auto border border-gray-300 dark:border-gray-700 text-sm">
+                  <thead>
+                    <tr className="bg-gray-100 dark:bg-gray-800">
+                      <th className="p-2 border">Employee</th>
+                      <th className="p-2 border">Email</th>
+                      <th className="p-2 border">Allocated Until</th>
+                      <th className="p-2 border">Start Time</th>
+                      <th className="p-2 border">End Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allocatedEmployees.map((emp) => (
+                      <tr key={emp.id} className="text-center">
+                        <td className="p-2 border">{emp.name}</td>
+                        <td className="p-2 border">{emp.email}</td>
+                        <td className="p-2 border">{emp.shiftEndDate}</td>
+                        <td className="p-2 border">{formatTime12Hour(emp.startTime.slice(0, 5))}</td>
+                        <td className="p-2 border">{formatTime12Hour(emp.endTime.slice(0, 5))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-center py-4 text-gray-500 dark:text-gray-400 border rounded p-4">
+                No employees are currently allocated to any shifts.
+              </p>
+            )}
+          </div>
 
           {/* Shift History */}
           {shiftHistory.length > 0 && selectedIds.length === 1 && (

@@ -35,6 +35,51 @@ interface Project {
   created_at: any;
 }
 
+// --- AI Project Panel ---
+function AIProjectPanel({ projects }: { projects: Project[] }) {
+  // Project health: delayed or overdue projects
+  const delayed = React.useMemo(() => projects.filter(p => p.status === 'delayed'), [projects]);
+  const completed = React.useMemo(() => projects.filter(p => p.status === 'completed'), [projects]);
+  const active = React.useMemo(() => projects.filter(p => p.status === 'active'), [projects]);
+  const [expanded, setExpanded] = React.useState(false);
+  return (
+    <div className="mb-6 bg-gradient-to-br from-blue-50 via-yellow-50 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 rounded-xl shadow p-4">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2">🤖 AI Project Insights</h3>
+        <button onClick={() => setExpanded(e => !e)} className="text-xs text-blue-600 dark:text-blue-300 underline">{expanded ? 'Hide' : 'Show'}</button>
+      </div>
+      {expanded && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <h4 className="font-semibold text-red-700 dark:text-red-300 mb-1 text-xs flex items-center gap-1">⏳ Delayed Projects</h4>
+            {delayed.length === 0 ? <div className="text-xs text-gray-400">None</div> : (
+              <ul className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                {delayed.map((p, i) => <li key={i}>{p.name}</li>)}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h4 className="font-semibold text-green-700 dark:text-green-300 mb-1 text-xs flex items-center gap-1">✅ Completed Projects</h4>
+            {completed.length === 0 ? <div className="text-xs text-gray-400">None</div> : (
+              <ul className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                {completed.map((p, i) => <li key={i}>{p.name}</li>)}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h4 className="font-semibold text-blue-700 dark:text-blue-300 mb-1 text-xs flex items-center gap-1">🚀 Active Projects</h4>
+            {active.length === 0 ? <div className="text-xs text-gray-400">None</div> : (
+              <ul className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                {active.map((p, i) => <li key={i}>{p.name}</li>)}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Projects() {
   const [showModal, setShowModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(
@@ -170,6 +215,7 @@ function Projects() {
 
   return (
     <div className="p-6">
+      <AIProjectPanel projects={projects} />
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">

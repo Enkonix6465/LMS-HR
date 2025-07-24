@@ -18,6 +18,9 @@ import {
   MessageSquareTextIcon,
   Bell,
   Landmark,
+  FileWarning,
+  FileText,
+  BarChart2,
 } from "lucide-react";
 import {
   onSnapshot,
@@ -143,7 +146,8 @@ function Layout() {
         <nav className="flex-1 overflow-auto px-4 py-4 space-y-1">
           {[
             { path: "/", icon: LayoutDashboard, label: "Dashboard" },
-            { path: "/users", icon: Users, label: "Users" },
+            { path: "/org-chart", icon: Users, label: "Org Chart" },
+            
             {
               path: "/WorkLocationAssignment",
               icon: Landmark,
@@ -172,7 +176,8 @@ function Layout() {
             { path: "/OfficeIPConfig", icon: CheckSquare, label: "Office IPs" },
             { path: "/CheckDevice", icon: CheckSquare, label: "Check Device" },
             { path: "/Chatbot", icon: MessageSquareTextIcon, label: "Chatbot" },
-            { path: "/Faqadmin", icon: Book, label: "FAQ Admin" },
+            { path: "/complaint-management", icon: FileWarning, label: "Complaints" },
+            { path: "/voting", icon: BarChart2, label: "Voting" },
             { path: "/settings", icon: Settings, label: "Settings" },
           ].map(({ path, icon: Icon, label }) => (
             <Link

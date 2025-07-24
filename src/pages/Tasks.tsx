@@ -18,6 +18,56 @@ interface Task {
   created_at: any;
 }
 
+// --- AI Task Panel ---
+function AITaskPanel({ tasks }: { tasks: Task[] }) {
+  // Overdue tasks
+  const overdue = React.useMemo(() => tasks.filter(t => t.status === 'overdue'), [tasks]);
+  // In progress
+  const inProgress = React.useMemo(() => tasks.filter(t => t.status === 'in_progress'), [tasks]);
+  // Completed
+  const completed = React.useMemo(() => tasks.filter(t => t.status === 'completed'), [tasks]);
+  // Productivity tip
+  const tip = overdue.length > 0 ? 'Focus on overdue tasks first!' : inProgress.length > 0 ? 'Keep up the momentum on in-progress tasks.' : 'Great job! All tasks are up to date.';
+  const [expanded, setExpanded] = React.useState(false);
+  return (
+    <div className="mb-6 bg-gradient-to-br from-blue-50 via-yellow-50 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 rounded-xl shadow p-4">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2">🤖 AI Task Insights</h3>
+        <button onClick={() => setExpanded(e => !e)} className="text-xs text-blue-600 dark:text-blue-300 underline">{expanded ? 'Hide' : 'Show'}</button>
+      </div>
+      {expanded && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <h4 className="font-semibold text-red-700 dark:text-red-300 mb-1 text-xs flex items-center gap-1">⚠️ Overdue Tasks</h4>
+            {overdue.length === 0 ? <div className="text-xs text-gray-400">None</div> : (
+              <ul className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                {overdue.map((t, i) => <li key={i}>{t.title}</li>)}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h4 className="font-semibold text-yellow-700 dark:text-yellow-300 mb-1 text-xs flex items-center gap-1">🚧 In Progress</h4>
+            {inProgress.length === 0 ? <div className="text-xs text-gray-400">None</div> : (
+              <ul className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                {inProgress.map((t, i) => <li key={i}>{t.title}</li>)}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h4 className="font-semibold text-green-700 dark:text-green-300 mb-1 text-xs flex items-center gap-1">✅ Completed</h4>
+            {completed.length === 0 ? <div className="text-xs text-gray-400">None</div> : (
+              <ul className="text-xs text-gray-700 dark:text-gray-200 space-y-1">
+                {completed.map((t, i) => <li key={i}>{t.title}</li>)}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+      <div className="mt-2 text-xs text-blue-700 dark:text-blue-300 font-semibold">{tip}</div>
+    </div>
+  );
+}
+
 function Tasks() {
   const [showModal, setShowModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
@@ -174,6 +224,7 @@ function Tasks() {
 
   return (
     <div className="p-6">
+      <AITaskPanel tasks={tasks} />
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Tasks</h1>
